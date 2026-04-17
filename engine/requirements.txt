@@ -1,0 +1,5 @@
+audio-separator
+torch
+onnxruntime-gpu
+soundfile
+numpy

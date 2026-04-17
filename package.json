@@ -1,0 +1,60 @@
+{
+  "name": "audiosplit",
+  "version": "0.1.0",
+  "description": "Desktop app to split audio stems with AI models.",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"npm run dev:renderer\" \"npm run dev:electron\"",
+    "dev:renderer": "vite",
+    "dev:electron": "wait-on tcp:5173 && npm run build:electron && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "build": "npm run build:renderer && npm run build:electron",
+    "build:renderer": "vite build",
+    "build:electron": "node scripts/build-electron.mjs",
+    "preview": "vite preview",
+    "start": "electron ."
+  },
+  "keywords": [
+    "electron",
+    "react",
+    "audio"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "react": "latest",
+    "react-dom": "latest",
+    "react-dropzone": "latest",
+    "zustand": "latest"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "autoprefixer": "latest",
+    "concurrently": "latest",
+    "cross-env": "latest",
+    "electron": "latest",
+    "electron-builder": "latest",
+    "esbuild": "latest",
+    "postcss": "latest",
+    "tailwindcss": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "wait-on": "latest"
+  },
+  "build": {
+    "appId": "com.audiosplit.app",
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "electron/**",
+      "engine/**",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    }
+  }
+}

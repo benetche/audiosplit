@@ -1,0 +1,22 @@
+node_modules
+dist
+dist-electron
+release
+.env
+.env.*
+.venv
+output/*
+!output/.gitkeep
+*.log
+__pycache__/
+# Pesos ONNX baixados pelo audio-separator
+engine/models/*
+!engine/models/.gitkeep
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*serviceAccount*.json
+credentials*.json
+firebase-adminsdk*.json
