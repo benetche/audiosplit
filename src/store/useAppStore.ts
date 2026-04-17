@@ -1,31 +1,6 @@
 import { create } from "zustand";
-import type { ProgressPayload, SeparationDeviceMode } from "../electron/types";
-import { initialMutedChannels, type MixerChannel } from "./mixerChannels";
-
-export type StemItem = {
-  path: string;
-  name: string;
-};
-
-type AppState = {
-  selectedFilePath: string;
-  selectedFileName: string;
-  deviceMode: SeparationDeviceMode;
-  logs: string[];
-  progress: number;
-  processing: boolean;
-  outputDir: string;
-  stems: StemItem[];
-  /** true = canal mutado (sem contribuicao no mix) */
-  mutedChannels: Record<MixerChannel, boolean>;
-  setFile: (path: string, name: string) => void;
-  setDeviceMode: (mode: SeparationDeviceMode) => void;
-  appendLog: (entry: string) => void;
-  resetJob: () => void;
-  setProcessing: (processing: boolean) => void;
-  applyProgress: (payload: ProgressPayload) => void;
-  toggleChannelMute: (channel: MixerChannel) => void;
-};
+import { initialMutedChannels } from "../lib/mixer/channels";
+import type { AppState } from "./types";
 
 export const useAppStore = create<AppState>((set) => ({
   selectedFilePath: "",
@@ -72,3 +47,5 @@ export const useAppStore = create<AppState>((set) => ({
       mutedChannels: { ...state.mutedChannels, [channel]: !state.mutedChannels[channel] }
     }))
 }));
+
+export type { StemItem, AppState } from "./types";
