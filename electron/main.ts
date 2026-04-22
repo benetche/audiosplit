@@ -9,6 +9,7 @@ import type {
   LibraryEntry,
   ProgressPayload,
   SeparationDeviceInfo,
+  SeparationDeviceInfo,
   SeparationDeviceMode,
   StartSeparationRequest,
   StartSeparationResponse,
@@ -311,7 +312,7 @@ const listSeparationDevices = async (): Promise<SeparationDeviceInfo[]> => {
           return;
         }
       } catch {
-        /* fallthrough */
+        // ignore parse failures and fallback
       }
       resolve([{ mode: "cpu", name: "CPU", label: "CPU - CPU", kind: "cpu" }]);
     });

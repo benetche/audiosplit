@@ -24,10 +24,7 @@ export function DeviceSelector() {
     };
   }, []);
 
-  const hasCurrentMode = useMemo(
-    () => devices.some((d) => d.mode === deviceMode),
-    [devices, deviceMode]
-  );
+  const hasCurrentMode = useMemo(() => devices.some((d) => d.mode === deviceMode), [devices, deviceMode]);
 
   useEffect(() => {
     if (devices.length === 0) return;
