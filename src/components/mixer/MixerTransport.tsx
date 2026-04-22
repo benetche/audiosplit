@@ -1,3 +1,4 @@
+import { Pause, Play } from "lucide-react";
 import { formatTime } from "../../lib/audio/formatTime";
 
 type MixerTransportProps = {
@@ -11,18 +12,19 @@ type MixerTransportProps = {
 
 export function MixerTransport({ playing, ready, duration, displayTime, onPlayPause, onSeek }: MixerTransportProps) {
   return (
-    <>
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-4">
         <button
           type="button"
           onClick={onPlayPause}
           disabled={!ready}
-          className="rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label={playing ? "Pausar" : "Tocar"}
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-white transition-all duration-200 hover:scale-[1.06] hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
         >
-          {playing ? "Pausar" : "Tocar"}
+          {playing ? <Pause className="h-5 w-5" strokeWidth={2} /> : <Play className="ml-0.5 h-5 w-5" strokeWidth={2} />}
         </button>
-        <span className="font-mono text-sm tabular-nums text-zinc-300">
-          {formatTime(displayTime)} / {formatTime(duration)}
+        <span className="mono text-sm tabular-nums text-text-secondary">
+          {formatTime(displayTime)} <span className="text-text-muted">/ {formatTime(duration)}</span>
         </span>
       </div>
 
@@ -34,8 +36,8 @@ export function MixerTransport({ playing, ready, duration, displayTime, onPlayPa
         value={Math.min(displayTime, duration || 0)}
         disabled={!ready || !duration}
         onChange={(e) => onSeek(Number.parseFloat(e.target.value))}
-        className="h-2 w-full cursor-pointer accent-accent disabled:opacity-40"
+        className="h-1 w-full cursor-pointer accent-accent disabled:opacity-40"
       />
-    </>
+    </div>
   );
 }

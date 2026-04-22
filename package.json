@@ -21,6 +21,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "lucide-react": "^1.8.0",
     "react": "latest",
     "react-dom": "latest",
     "react-dropzone": "latest",

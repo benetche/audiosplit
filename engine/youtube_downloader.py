@@ -195,16 +195,56 @@ def run_download(url: str, output_dir: str, audio_format: SupportedFormat, job_i
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="AudioSplit YouTube downloader")
     parser.add_argument("--url", required=True, dest="url")
-    parser.add_argument("--output-dir", required=True, dest="output_dir")
-    parser.add_argument("--job-id", required=True, dest="job_id")
+    parser.add_argument("--output-dir", required=False, dest="output_dir", default="")
+    parser.add_argument("--job-id", required=False, dest="job_id", default="preview")
     parser.add_argument(
         "--format",
-        required=True,
+        required=False,
         choices=list(SUPPORTED_FORMATS),
         dest="audio_format",
+        default="mp3",
         help="Extensao final do arquivo de audio",
     )
+    parser.add_argument(
+        "--preview-only",
+        action="store_true",
+        dest="preview_only",
+        help="Apenas retorna metadados do video sem baixar",
+    )
     return parser.parse_args()
+
+
+def run_preview(url: str, job_id: str) -> dict[str, Any]:
+    import yt_dlp
+
+    ydl_opts = {
+        "skip_download": True,
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        if info is None:
+            raise RuntimeError("yt-dlp nao retornou informacoes do video.")
+
+    thumbnails = info.get("thumbnails") or []
+    best_thumb = None
+    for t in thumbnails:
+        if not t.get("url"):
+            continue
+        if best_thumb is None or (t.get("height") or 0) > (best_thumb.get("height") or 0):
+            best_thumb = t
+    thumbnail_url = (best_thumb or {}).get("url") or info.get("thumbnail")
+
+    return {
+        "title": info.get("title") or "",
+        "duration": info.get("duration") or 0,
+        "uploader": info.get("uploader") or info.get("channel") or "",
+        "thumbnail": thumbnail_url or "",
+        "webpageUrl": info.get("webpage_url") or url,
+        "jobId": job_id,
+    }
 
 
 def main() -> int:
@@ -213,14 +253,29 @@ def main() -> int:
     output_dir: str = args.output_dir
     job_id: str = args.job_id
     audio_format: SupportedFormat = args.audio_format  # type: ignore[assignment]
-
-    emit({"type": "status", "message": f"YouTube downloader iniciado (format: {audio_format})", "jobId": job_id})
+    preview_only: bool = bool(args.preview_only)
 
     if not is_valid_youtube_url(url):
         emit({"type": "error", "message": "URL do YouTube invalida.", "jobId": job_id})
         return 1
 
     ensure_yt_dlp()
+
+    if preview_only:
+        try:
+            info = run_preview(url, job_id)
+            emit({"type": "preview", **info})
+            return 0
+        except Exception as exc:  # noqa: BLE001
+            emit({"type": "error", "message": f"Falha no preview: {exc}", "jobId": job_id})
+            traceback.print_exc()
+            return 1
+
+    if not output_dir:
+        emit({"type": "error", "message": "--output-dir obrigatorio para download.", "jobId": job_id})
+        return 1
+
+    emit({"type": "status", "message": f"YouTube downloader iniciado (format: {audio_format})", "jobId": job_id})
     ensure_ffmpeg()
 
     try:

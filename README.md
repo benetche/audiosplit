@@ -92,26 +92,26 @@ npm run build
 - **Unified playback mixer:** single play/pause timeline for all stems.
 - **Per-channel mute:** mute/unmute vocals, drums, bass, guitars, and others.
 - **Device modes:** automatic, CPU, CUDA, and Apple Silicon mode (when available).
-- **YouTube downloader:** download audio from a YouTube video in MP3/WAV/FLAC/M4A with optional automatic import into the stem separation flow.
+- **YouTube downloader:** download audio from a YouTube video in MP3/WAV/FLAC/M4A, with an option to automatically import it into the stem separation flow.
 
 ### YouTube downloader
 
-The "YouTube Download" panel uses the Python sidecar with [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) and system FFmpeg to download and convert audio.
+The "YouTube download" panel uses the Python sidecar with [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) and the system FFmpeg to download and convert the audio.
 
 Requirements:
 
-- `yt-dlp` installed in the virtual environment (already included in `engine/requirements.txt`). Reinstall when updating with `pip install -r engine/requirements.txt`.
-- FFmpeg available on `PATH` (same requirement as the separation flow).
+- `yt-dlp` installed in the venv (already listed in `engine/requirements.txt`). Reinstall when updating: `pip install -r engine/requirements.txt`.
+- FFmpeg on the PATH (same requirement as the separation flow).
 
 Usage:
 
 1. Paste the video URL (supports `youtube.com/watch?v=...`, `youtu.be/...`, and `music.youtube.com/...`).
-2. Select the output format: MP3, WAV, FLAC, or M4A.
-3. Choose the destination folder using the "Choose..." button. The default is `~/Music/AudioSplit`.
-4. Enable "Automatically import for stem separation" if you want the downloaded file to be ready for the "Separate" action.
-5. Click "Download". Progress appears in the panel progress bar, and detailed messages are shown in "Logs".
+2. Pick the output format: MP3, WAV, FLAC, or M4A.
+3. Select the destination folder (via the "Choose..." button). Default: `~/Music/AudioSplit`.
+4. Check "Automatically import into stem separation" to have the downloaded file immediately ready for the "Separate" button.
+5. Click "Download". Progress is shown in the panel's bar, and detailed messages go to the "Logs" section.
 
-Note: all four available formats are exactly the formats accepted by the separator, so auto-import works for any selected option.
+Note: the four offered formats match exactly those accepted by the separator, so auto-import works regardless of the format you pick.
 
 ## Open-source Collaboration
 

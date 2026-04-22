@@ -6,12 +6,15 @@ import { existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import type {
   DownloadAudioFormat,
+  LibraryEntry,
   ProgressPayload,
   SeparationDeviceMode,
   StartSeparationRequest,
   StartSeparationResponse,
   StartYoutubeDownloadRequest,
   StartYoutubeDownloadResponse,
+  YoutubePreviewInfo,
+  YoutubePreviewResponse,
   YoutubeProgressPayload
 } from "./types";
 
@@ -109,15 +112,29 @@ const activeDownloads = new Map<string, ChildProcess>();
 
 const createWindow = (): void => {
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 760,
-    backgroundColor: "#09090f",
+    width: 1200,
+    height: 800,
+    minWidth: 900,
+    minHeight: 620,
+    backgroundColor: "#0F111A",
+    frame: false,
+    titleBarStyle: "hidden",
+    titleBarOverlay: process.platform === "win32"
+      ? { color: "#0F111A", symbolColor: "#F8FAFC", height: 36 }
+      : undefined,
+    trafficLightPosition: { x: 12, y: 12 },
     webPreferences: {
       preload: path.join(app.getAppPath(), "dist-electron", "preload.js"),
       contextIsolation: true,
       nodeIntegration: false
     }
   });
+
+  const emitMaximizeChange = (): void => {
+    mainWindow?.webContents.send("window:maximize-change", mainWindow.isMaximized());
+  };
+  mainWindow.on("maximize", emitMaximizeChange);
+  mainWindow.on("unmaximize", emitMaximizeChange);
 
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
   if (devServerUrl) {
@@ -353,12 +370,198 @@ const runYoutubeDownload = async (
   });
 };
 
+const runYoutubePreview = async (url: string): Promise<YoutubePreviewResponse> => {
+  if (!YOUTUBE_URL_RE.test(url.trim())) {
+    return { success: false, error: "URL do YouTube invalida." };
+  }
+  const pythonCommand = resolvePythonCommand();
+  const youtubeScript = getYoutubeScriptPath();
+  return new Promise<YoutubePreviewResponse>((resolve) => {
+    const child = spawn(pythonCommand, ["-u", youtubeScript, "--url", url.trim(), "--preview-only"], {
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
+    let info: YoutubePreviewInfo | null = null;
+    let reportedError: string | undefined;
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdoutBuffer += chunk.toString("utf8");
+      const lines = stdoutBuffer.split("\n");
+      stdoutBuffer = lines.pop() ?? "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const payload = JSON.parse(trimmed);
+          if (payload.type === "preview") {
+            info = {
+              title: String(payload.title ?? ""),
+              duration: Number(payload.duration ?? 0) || 0,
+              uploader: String(payload.uploader ?? ""),
+              thumbnail: String(payload.thumbnail ?? ""),
+              webpageUrl: String(payload.webpageUrl ?? "")
+            };
+          } else if (payload.type === "error") {
+            reportedError = typeof payload.message === "string" ? payload.message : reportedError;
+          }
+        } catch {
+          /* ignorar linhas nao-JSON */
+        }
+      }
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderrBuffer += chunk.toString("utf8");
+    });
+    child.on("error", (err) => {
+      reportedError = reportedError ?? err.message;
+    });
+    child.on("close", (code) => {
+      if (info) {
+        resolve({ success: true, info });
+        return;
+      }
+      resolve({
+        success: false,
+        error: reportedError ?? stderrBuffer.trim() ?? `Processo Python encerrou com codigo ${String(code)}.`
+      });
+    });
+  });
+};
+
 const cancelYoutubeDownload = (jobId: string): boolean => {
   const child = activeDownloads.get(jobId);
   if (!child) return false;
   child.kill("SIGTERM");
   activeDownloads.delete(jobId);
   return true;
+};
+
+const AUDIO_EXT_RE = /\.(wav|mp3|flac|m4a|aiff|aif|ogg)$/i;
+const JOB_ID_SUFFIX_RE = /_[0-9a-f-]{8,}$/i;
+
+const listLibraryEntries = async (): Promise<LibraryEntry[]> => {
+  const root = getOutputRoot();
+  if (!existsSync(root)) return [];
+  let dirents: import("node:fs").Dirent[];
+  try {
+    dirents = await fs.readdir(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const entries: LibraryEntry[] = [];
+  for (const dirent of dirents) {
+    if (!dirent.isDirectory()) continue;
+    const fullPath = path.join(root, dirent.name);
+    try {
+      const childStat = await fs.stat(fullPath);
+      const stemFiles = (await fs.readdir(fullPath))
+        .filter((f) => AUDIO_EXT_RE.test(f))
+        .sort();
+      if (stemFiles.length === 0) continue;
+      const displayName = dirent.name.replace(JOB_ID_SUFFIX_RE, "");
+      entries.push({
+        id: dirent.name,
+        name: displayName || dirent.name,
+        path: fullPath,
+        createdAt: childStat.mtime.toISOString(),
+        stems: stemFiles.map((f) => path.join(fullPath, f))
+      });
+    } catch {
+      /* ignorar entradas ilegiveis */
+    }
+  }
+
+  entries.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  return entries;
+};
+
+const removeLibraryEntry = async (targetPath: string): Promise<{ success: boolean; error?: string }> => {
+  const normalized = path.normalize(targetPath);
+  if (!isPathUnderOutputRoot(normalized)) {
+    return { success: false, error: "Caminho fora do diretorio de saida." };
+  }
+  try {
+    await fs.rm(normalized, { recursive: true, force: true });
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
+  }
+};
+
+const loadLibraryEntry = async (targetPath: string): Promise<{ success: boolean; stems: string[]; error?: string }> => {
+  const normalized = path.normalize(targetPath);
+  if (!isPathUnderOutputRoot(normalized)) {
+    return { success: false, stems: [], error: "Caminho fora do diretorio de saida." };
+  }
+  try {
+    const stems = (await fs.readdir(normalized))
+      .filter((f) => AUDIO_EXT_RE.test(f))
+      .sort()
+      .map((f) => path.join(normalized, f));
+    return { success: true, stems };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, stems: [], error: message };
+  }
+};
+
+const getEnvInfo = async (): Promise<import("./types").EnvInfo> => {
+  const pythonPath = resolvePythonCommand();
+  let ffmpegFound = false;
+  let ffmpegVersion = "";
+  try {
+    const version: string = await new Promise((resolve) => {
+      const child = spawn("ffmpeg", ["-version"], { stdio: ["ignore", "pipe", "pipe"] });
+      let out = "";
+      child.stdout.on("data", (d: Buffer) => {
+        out += d.toString("utf8");
+      });
+      child.on("error", () => resolve(""));
+      child.on("close", () => resolve(out));
+    });
+    if (version) {
+      ffmpegFound = true;
+      const firstLine = version.split("\n")[0] ?? "";
+      ffmpegVersion = firstLine.trim();
+    }
+  } catch {
+    ffmpegFound = false;
+  }
+  return {
+    pythonPath,
+    ffmpegFound,
+    ffmpegVersion,
+    appVersion: app.getVersion(),
+    outputRoot: getOutputRoot(),
+    defaultDownloadDir: getDefaultDownloadDir(),
+    platform: process.platform
+  };
+};
+
+const exportStem = async (sourcePath: string): Promise<{ success: boolean; destination?: string; error?: string }> => {
+  if (!mainWindow) return { success: false, error: "Janela nao disponivel." };
+  if (!sourcePath || !existsSync(sourcePath)) {
+    return { success: false, error: "Arquivo de origem nao encontrado." };
+  }
+  const baseName = path.basename(sourcePath);
+  const ext = path.extname(baseName) || ".wav";
+  const defaultPath = path.join(getDefaultDownloadDir(), baseName);
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: "Exportar stem",
+    defaultPath,
+    filters: [{ name: "Audio", extensions: [ext.replace(/^\./, "")] }]
+  });
+  if (result.canceled || !result.filePath) return { success: false };
+  try {
+    await fs.copyFile(sourcePath, result.filePath);
+    return { success: true, destination: result.filePath };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
+  }
 };
 
 const chooseDownloadDirectory = async (): Promise<string | null> => {
@@ -388,6 +591,33 @@ app.whenReady().then(() => {
   ipcMain.handle("youtube:cancel", async (_event, jobId: string) => cancelYoutubeDownload(jobId));
   ipcMain.handle("youtube:choose-directory", async () => chooseDownloadDirectory());
   ipcMain.handle("youtube:default-directory", async () => getDefaultDownloadDir());
+  ipcMain.handle("youtube:preview", async (_event, url: string) => runYoutubePreview(url));
+
+  ipcMain.handle("stem:export", async (_event, sourcePath: string) => exportStem(sourcePath));
+
+  ipcMain.handle("library:list", async () => listLibraryEntries());
+  ipcMain.handle("library:remove", async (_event, dirPath: string) => removeLibraryEntry(dirPath));
+  ipcMain.handle("library:load", async (_event, dirPath: string) => loadLibraryEntry(dirPath));
+
+  ipcMain.handle("env:info", async () => getEnvInfo());
+
+  ipcMain.handle("window:minimize", () => {
+    mainWindow?.minimize();
+    return mainWindow?.isMaximized() ?? false;
+  });
+  ipcMain.handle("window:toggle-maximize", () => {
+    if (!mainWindow) return false;
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+    return mainWindow.isMaximized();
+  });
+  ipcMain.handle("window:close", () => {
+    mainWindow?.close();
+  });
+  ipcMain.handle("window:is-maximized", () => mainWindow?.isMaximized() ?? false);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

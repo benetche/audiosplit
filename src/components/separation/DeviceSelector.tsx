@@ -7,13 +7,13 @@ export function DeviceSelector() {
   const processing = useAppStore((s) => s.processing);
 
   return (
-    <label className="flex flex-col gap-1.5 text-xs text-zinc-500">
-      <span className="text-zinc-400">Dispositivo</span>
+    <label className="flex flex-col gap-1.5 text-xs text-text-secondary">
+      <span>Dispositivo</span>
       <select
         value={deviceMode}
         onChange={(e) => setDeviceMode(e.target.value as SeparationDeviceMode)}
         disabled={processing}
-        className="min-w-[200px] rounded-lg border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-white disabled:opacity-50"
+        className="min-w-[200px] rounded-xl2 border border-white/5 bg-background px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-accent/40 disabled:opacity-50"
       >
         <option value="auto">Automatico</option>
         <option value="cuda">GPU NVIDIA</option>

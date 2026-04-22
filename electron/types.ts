@@ -52,3 +52,34 @@ export type StartYoutubeDownloadResponse = {
   outputDir?: string;
   error?: string;
 };
+
+export type YoutubePreviewInfo = {
+  title: string;
+  duration: number;
+  uploader: string;
+  thumbnail: string;
+  webpageUrl: string;
+};
+
+export type YoutubePreviewResponse =
+  | { success: true; info: YoutubePreviewInfo }
+  | { success: false; error: string };
+
+export type EnvInfo = {
+  pythonPath: string;
+  ffmpegFound: boolean;
+  ffmpegVersion: string;
+  appVersion: string;
+  outputRoot: string;
+  defaultDownloadDir: string;
+  platform: string;
+};
+
+export type LibraryEntry = {
+  id: string;
+  name: string;
+  path: string;
+  /** ISO string */
+  createdAt: string;
+  stems: string[];
+};

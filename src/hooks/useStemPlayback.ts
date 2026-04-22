@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { inferMixerChannel } from "../lib/mixer/channels";
+import { effectiveMute, inferMixerChannel } from "../lib/mixer/channels";
 import { useAppStore } from "../store/useAppStore";
 import type { StemItem } from "../store/types";
 
@@ -23,6 +23,7 @@ export type StemPlaybackApi = {
  */
 export function useStemPlayback(stems: StemItem[]): StemPlaybackApi {
   const mutedChannels = useAppStore((s) => s.mutedChannels);
+  const soloChannels = useAppStore((s) => s.soloChannels);
 
   const ctxRef = useRef<AudioContext | null>(null);
   const nodesRef = useRef<Map<string, StemNode>>(new Map());
@@ -49,6 +50,7 @@ export function useStemPlayback(stems: StemItem[]): StemPlaybackApi {
     ctxRef.current = ctx;
     const map = new Map<string, StemNode>();
     const muted = useAppStore.getState().mutedChannels;
+    const solo = useAppStore.getState().soloChannels;
 
     for (const stem of stems) {
       const audio = document.createElement("audio");
@@ -57,7 +59,7 @@ export function useStemPlayback(stems: StemItem[]): StemPlaybackApi {
       const source = ctx.createMediaElementSource(audio);
       const gain = ctx.createGain();
       const ch = inferMixerChannel(stem.name);
-      gain.gain.value = muted[ch] ? 0 : 1;
+      gain.gain.value = effectiveMute(ch, muted, solo) ? 0 : 1;
       source.connect(gain);
       gain.connect(ctx.destination);
       map.set(stem.path, { audio, gain });
@@ -96,10 +98,10 @@ export function useStemPlayback(stems: StemItem[]): StemPlaybackApi {
       const n = map.get(stem.path);
       if (!n) continue;
       const ch = inferMixerChannel(stem.name);
-      const m = mutedChannels[ch];
+      const m = effectiveMute(ch, mutedChannels, soloChannels);
       n.gain.gain.setValueAtTime(m ? 0 : 1, ctx.currentTime);
     }
-  }, [mutedChannels, stems, stemKey]);
+  }, [mutedChannels, soloChannels, stems, stemKey]);
 
   useEffect(() => {
     if (stems.length === 0) return;

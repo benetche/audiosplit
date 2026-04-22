@@ -1,26 +1,49 @@
+import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 
 export function LogsPanel() {
   const logs = useAppStore((s) => s.logs);
+  const clearLogs = useAppStore((s) => s.clearLogs);
   const [open, setOpen] = useState(false);
 
   return (
-    <section className="border-t border-zinc-800 pt-4">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-2 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500 hover:text-zinc-400"
-      >
-        <span>Detalhes</span>
-        <span className="text-zinc-600">{open ? "−" : "+"}</span>
-      </button>
-      {open ? (
-        <div className="max-h-40 overflow-auto rounded-lg bg-zinc-950/80 p-3 font-mono text-[11px] leading-relaxed text-zinc-400">
-          {logs.length === 0 ? (
-            <p className="text-zinc-600">Sem logs.</p>
+    <section className="rounded-xl2 border border-white/5 bg-card/40">
+      <div className="flex items-center justify-between px-4 py-2">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-text-secondary transition-colors hover:text-text-primary"
+        >
+          {open ? (
+            <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.75} />
           ) : (
-            logs.map((line, idx) => <p key={`${line}-${idx}`}>{line}</p>)
+            <ChevronRight className="h-3.5 w-3.5" strokeWidth={1.75} />
+          )}
+          <span>Detalhes</span>
+          <span className="mono text-[10px] text-text-muted">({logs.length})</span>
+        </button>
+        {open && logs.length > 0 ? (
+          <button
+            type="button"
+            onClick={clearLogs}
+            aria-label="Limpar logs"
+            className="flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-white/5 hover:text-text-secondary"
+          >
+            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+          </button>
+        ) : null}
+      </div>
+      {open ? (
+        <div className="mono max-h-48 overflow-auto border-t border-white/5 p-3 text-[11px] leading-relaxed text-text-secondary">
+          {logs.length === 0 ? (
+            <p className="text-text-muted">Sem logs.</p>
+          ) : (
+            logs.map((line, idx) => (
+              <p key={`${line}-${idx}`} className="whitespace-pre-wrap break-words">
+                {line}
+              </p>
+            ))
           )}
         </div>
       ) : null}

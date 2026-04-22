@@ -1,7 +1,10 @@
+import { Download, FolderOpen, Loader2, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { DownloadAudioFormat } from "../../../electron/types";
+import { isValidYoutubeUrl } from "../../hooks/useYoutubePreview";
 import { useYoutubeDownload } from "../../hooks/useYoutubeDownload";
 import { useAppStore } from "../../store/useAppStore";
+import { UrlHero } from "./UrlHero";
 
 const FORMATS: { value: DownloadAudioFormat; label: string }[] = [
   { value: "mp3", label: "MP3" },
@@ -9,8 +12,6 @@ const FORMATS: { value: DownloadAudioFormat; label: string }[] = [
   { value: "flac", label: "FLAC" },
   { value: "m4a", label: "M4A" }
 ];
-
-const YOUTUBE_URL_RE = /^https?:\/\/(?:www\.|m\.|music\.)?(?:youtube\.com|youtu\.be)\/.+/i;
 
 export function YouTubeDownloadPanel() {
   const { state, start, cancel, reset } = useYoutubeDownload();
@@ -39,8 +40,9 @@ export function YouTubeDownloadPanel() {
   }, [outputDir, lastDownloadDir, setLastDownloadDir]);
 
   const isBusy = state.status === "downloading" || state.status === "converting";
-  const urlIsValid = useMemo(() => YOUTUBE_URL_RE.test(url.trim()), [url]);
+  const urlIsValid = useMemo(() => isValidYoutubeUrl(url), [url]);
   const canStart = urlIsValid && !isBusy && outputDir.length > 0;
+  const showAdvanced = urlIsValid || state.status !== "idle";
 
   const handleChooseDir = async () => {
     const chosen = await window.audioSplit.chooseDownloadDirectory();
@@ -62,13 +64,13 @@ export function YouTubeDownloadPanel() {
   const statusLabel = (() => {
     switch (state.status) {
       case "downloading":
-        return "Baixando...";
+        return "Baixando do YouTube...";
       case "converting":
-        return "Convertendo...";
+        return "Convertendo audio...";
       case "done":
-        return "Concluido";
+        return "Download concluido";
       case "error":
-        return "Erro";
+        return "Erro no download";
       default:
         return "";
     }
@@ -78,130 +80,123 @@ export function YouTubeDownloadPanel() {
   const clamped = Math.max(0, Math.min(state.percent, 100));
 
   return (
-    <section className="rounded-2xl border border-zinc-800 bg-card p-6 shadow-lg shadow-black/20">
-      <div className="mb-4 flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold text-white">Baixar do YouTube</h2>
-        <span className="text-xs text-zinc-500">Converte o audio via yt-dlp + FFmpeg</span>
-      </div>
+    <section className="flex flex-col gap-4 rounded-xl2 border border-white/5 bg-card p-5 shadow-card">
+      <UrlHero value={url} onChange={setUrl} disabled={isBusy} />
 
-      <div className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1.5 text-xs text-zinc-500">
-          <span className="text-zinc-400">URL do video</span>
-          <input
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://www.youtube.com/watch?v=..."
-            disabled={isBusy}
-            className="rounded-lg border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-white placeholder-zinc-600 disabled:opacity-50"
-          />
-          {url.length > 0 && !urlIsValid ? (
-            <span className="text-xs text-red-400">URL invalida. Use um link do YouTube.</span>
-          ) : null}
-        </label>
-
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-          <label className="flex flex-col gap-1.5 text-xs text-zinc-500">
-            <span className="text-zinc-400">Formato</span>
-            <select
-              value={format}
-              onChange={(e) => setFormat(e.target.value as DownloadAudioFormat)}
-              disabled={isBusy}
-              className="min-w-[140px] rounded-lg border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-white disabled:opacity-50"
-            >
-              {FORMATS.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-1 flex-col gap-1.5 text-xs text-zinc-500">
-            <span className="text-zinc-400">Pasta de destino</span>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                readOnly
-                value={outputDir}
-                placeholder="Selecione uma pasta..."
-                className="flex-1 rounded-lg border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
-              />
-              <button
-                type="button"
-                onClick={() => void handleChooseDir()}
+      {showAdvanced ? (
+        <div className="flex flex-col gap-4 animate-fade-in">
+          <div className="flex flex-col gap-4 sm:flex-row">
+            <label className="flex flex-col gap-1.5 text-xs text-text-secondary">
+              <span>Formato</span>
+              <select
+                value={format}
+                onChange={(e) => setFormat(e.target.value as DownloadAudioFormat)}
                 disabled={isBusy}
-                className="rounded-lg border border-zinc-600 px-3 py-2 text-sm text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                className="min-w-[140px] rounded-xl2 border border-white/5 bg-background px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-accent/40 disabled:opacity-50"
               >
-                Escolher...
-              </button>
-            </div>
+                {FORMATS.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-1 flex-col gap-1.5 text-xs text-text-secondary">
+              <span>Pasta de destino</span>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={outputDir}
+                  placeholder="Selecione uma pasta..."
+                  className="flex-1 truncate rounded-xl2 border border-white/5 bg-background px-3 py-2 text-sm text-text-primary"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleChooseDir()}
+                  disabled={isBusy}
+                  className="flex items-center gap-1.5 rounded-xl2 border border-white/5 bg-background px-3 py-2 text-sm text-text-secondary transition-all duration-200 hover:border-white/10 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <FolderOpen className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  Escolher
+                </button>
+              </div>
+            </label>
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-text-secondary">
+            <input
+              type="checkbox"
+              checked={autoImport}
+              onChange={(e) => setAutoImport(e.target.checked)}
+              disabled={isBusy}
+              className="h-4 w-4 rounded border-white/10 bg-background accent-accent"
+            />
+            <span>Importar automaticamente para a separacao de stems</span>
           </label>
-        </div>
 
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300">
-          <input
-            type="checkbox"
-            checked={autoImport}
-            onChange={(e) => setAutoImport(e.target.checked)}
-            disabled={isBusy}
-            className="h-4 w-4 rounded border-zinc-600 bg-zinc-900 accent-accent"
-          />
-          <span>Importar automaticamente para a separacao de stems</span>
-        </label>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void handleStart()}
-            disabled={!canStart}
-            className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {isBusy ? "Processando..." : "Baixar"}
-          </button>
-          <button
-            type="button"
-            onClick={() => void cancel()}
-            disabled={!isBusy}
-            className="rounded-lg border border-zinc-600 px-4 py-2.5 text-sm text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Cancelar
-          </button>
-          {state.status !== "idle" ? (
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={reset}
-              disabled={isBusy}
-              className="rounded-lg border border-zinc-700 px-3 py-2.5 text-xs text-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => void handleStart()}
+              disabled={!canStart}
+              className="flex items-center gap-2 rounded-xl2 bg-accent px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:scale-[1.03] hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
             >
-              Limpar
+              {isBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />
+              ) : (
+                <Download className="h-4 w-4" strokeWidth={2} />
+              )}
+              {isBusy ? "Processando..." : "Baixar"}
             </button>
-          ) : null}
-        </div>
-
-        {showProgress ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs text-zinc-500">
-              <span>{statusLabel}</span>
-              <span>{Math.round(clamped)}%</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
-              <div
-                className={`h-full rounded-full transition-[width] duration-300 ${
-                  state.status === "error" ? "bg-red-500" : "bg-accent"
-                }`}
-                style={{ width: `${clamped}%` }}
-              />
-            </div>
-            {state.status === "done" && state.title ? (
-              <p className="truncate text-xs text-zinc-400">Arquivo: {state.title}</p>
-            ) : null}
-            {state.status === "error" && state.error ? (
-              <p className="text-xs text-red-400">{state.error}</p>
+            <button
+              type="button"
+              onClick={() => void cancel()}
+              disabled={!isBusy}
+              className="flex items-center gap-1.5 rounded-xl2 border border-white/5 px-4 py-2.5 text-sm text-text-secondary transition-all duration-200 hover:border-white/10 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <XCircle className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Cancelar
+            </button>
+            {state.status !== "idle" ? (
+              <button
+                type="button"
+                onClick={reset}
+                disabled={isBusy}
+                className="rounded-xl2 border border-white/5 px-3 py-2.5 text-xs text-text-muted transition-colors hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Limpar
+              </button>
             ) : null}
           </div>
-        ) : null}
-      </div>
+
+          {showProgress ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between text-xs text-text-secondary">
+                <span>{statusLabel}</span>
+                <span className="mono">{Math.round(clamped)}%</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ease-out ${
+                    state.status === "error"
+                      ? "bg-red-500"
+                      : "bg-gradient-to-r from-accent to-accent-hover"
+                  }`}
+                  style={{ width: `${clamped}%` }}
+                />
+              </div>
+              {state.status === "done" && state.title ? (
+                <p className="truncate text-xs text-text-secondary">Arquivo: {state.title}</p>
+              ) : null}
+              {state.status === "error" && state.error ? (
+                <p className="text-xs text-red-400">{state.error}</p>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }

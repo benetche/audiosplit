@@ -23,6 +23,23 @@ export function initialMutedChannels(): Record<MixerChannel, boolean> {
   return { ...initialMuted };
 }
 
+export function initialSoloChannels(): Record<MixerChannel, boolean> {
+  return { ...initialMuted };
+}
+
+/**
+ * Regra: se houver qualquer canal em solo, so esses tocam. Senao, vale o mute.
+ */
+export function effectiveMute(
+  channel: MixerChannel,
+  muted: Record<MixerChannel, boolean>,
+  solo: Record<MixerChannel, boolean>
+): boolean {
+  const anySolo = MIXER_CHANNEL_ORDER.some((c) => solo[c]);
+  if (anySolo) return !solo[channel];
+  return muted[channel];
+}
+
 /** Mapeia ficheiro de stem para canal (instrumental / resto -> other). */
 export function inferMixerChannel(fileName: string): MixerChannel {
   const base = fileName.replace(/\.[^.]+$/, "");

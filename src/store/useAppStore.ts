@@ -1,8 +1,9 @@
 import { create } from "zustand";
-import { initialMutedChannels } from "../lib/mixer/channels";
+import { initialMutedChannels, initialSoloChannels } from "../lib/mixer/channels";
 import type { AppState } from "./types";
 
 export const useAppStore = create<AppState>((set) => ({
+  view: "download",
   selectedFilePath: "",
   selectedFileName: "",
   deviceMode: "auto",
@@ -12,18 +13,29 @@ export const useAppStore = create<AppState>((set) => ({
   outputDir: "",
   stems: [],
   mutedChannels: initialMutedChannels(),
+  soloChannels: initialSoloChannels(),
   lastDownloadDir: "",
+  setView: (view) => set({ view }),
   setFile: (selectedFilePath, selectedFileName) => set({ selectedFilePath, selectedFileName }),
+  setStems: (stems, outputDir) =>
+    set({
+      stems,
+      outputDir: outputDir ?? "",
+      mutedChannels: initialMutedChannels(),
+      soloChannels: initialSoloChannels()
+    }),
   setLastDownloadDir: (lastDownloadDir) => set({ lastDownloadDir }),
   setDeviceMode: (deviceMode) => set({ deviceMode }),
   appendLog: (entry) => set((state) => ({ logs: [...state.logs, entry] })),
+  clearLogs: () => set({ logs: [] }),
   resetJob: () =>
     set({
       logs: [],
       progress: 0,
       outputDir: "",
       stems: [],
-      mutedChannels: initialMutedChannels()
+      mutedChannels: initialMutedChannels(),
+      soloChannels: initialSoloChannels()
     }),
   setProcessing: (processing) => set({ processing }),
   applyProgress: (payload) =>
@@ -41,13 +53,18 @@ export const useAppStore = create<AppState>((set) => ({
         outputDir,
         stems,
         mutedChannels: stemsReplaced ? initialMutedChannels() : state.mutedChannels,
+        soloChannels: stemsReplaced ? initialSoloChannels() : state.soloChannels,
         logs: [...state.logs, `[${payload.type}] ${payload.message}`]
       };
     }),
   toggleChannelMute: (channel) =>
     set((state) => ({
       mutedChannels: { ...state.mutedChannels, [channel]: !state.mutedChannels[channel] }
+    })),
+  toggleChannelSolo: (channel) =>
+    set((state) => ({
+      soloChannels: { ...state.soloChannels, [channel]: !state.soloChannels[channel] }
     }))
 }));
 
-export type { StemItem, AppState } from "./types";
+export type { StemItem, AppState, AppView } from "./types";
