@@ -1,5 +1,12 @@
 export type SeparationDeviceMode = "auto" | "cuda" | "cpu" | "mps";
 
+export type SeparationDeviceInfo = {
+  mode: Exclude<SeparationDeviceMode, "auto">;
+  label: string;
+  name: string;
+  kind: "cpu" | "gpu";
+};
+
 export type ProgressPayload = {
   type: "status" | "progress" | "error" | "complete";
   message: string;

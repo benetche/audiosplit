@@ -3,6 +3,7 @@ import type {
   EnvInfo,
   LibraryEntry,
   ProgressPayload,
+  SeparationDeviceInfo,
   StartSeparationRequest,
   StartSeparationResponse,
   StartYoutubeDownloadRequest,
@@ -17,6 +18,7 @@ type SeparationApi = {
   /** URL para <audio src> (evita bloqueio file:// com origem http do Vite). */
   audioUrlFromPath: (absolutePath: string) => string;
   startSeparation: (request: StartSeparationRequest) => Promise<StartSeparationResponse>;
+  getSeparationDevices: () => Promise<SeparationDeviceInfo[]>;
   onProgress: (callback: (payload: ProgressPayload) => void) => () => void;
   openOutputFolder: (outputPath: string) => Promise<string>;
   startYoutubeDownload: (request: StartYoutubeDownloadRequest) => Promise<StartYoutubeDownloadResponse>;
@@ -55,6 +57,7 @@ const api: SeparationApi = {
   getLocalFilePath,
   audioUrlFromPath,
   startSeparation: (request: StartSeparationRequest) => ipcRenderer.invoke("separation:start", request),
+  getSeparationDevices: () => ipcRenderer.invoke("separation:devices"),
   onProgress: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: ProgressPayload) => callback(payload);
     ipcRenderer.on("separation:progress", listener);
