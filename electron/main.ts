@@ -8,6 +8,7 @@ import type {
   DownloadAudioFormat,
   LibraryEntry,
   ProgressPayload,
+  SeparationDeviceInfo,
   SeparationDeviceMode,
   StartSeparationRequest,
   StartSeparationResponse,
@@ -251,6 +252,71 @@ const runSeparation = async (request: StartSeparationRequest): Promise<StartSepa
       const stems = files.filter((file) => file.toLowerCase().endsWith(".wav")).map((file) => path.join(outputDir, file));
       sendProgress({ type: "complete", message: "Separation finished.", progress: 100, jobId, outputDir, stems });
       resolve({ success: true, jobId, outputDir, stems });
+    });
+  });
+};
+
+const listSeparationDevices = async (): Promise<SeparationDeviceInfo[]> => {
+  const pythonCommand = resolvePythonCommand();
+  const script = [
+    "import json, platform",
+    "devices = []",
+    "cpu_name = ''",
+    "try:",
+    "    if platform.system().lower() == 'linux':",
+    "        with open('/proc/cpuinfo', 'r', encoding='utf-8', errors='ignore') as f:",
+    "            for line in f:",
+    "                if 'model name' in line:",
+    "                    cpu_name = line.split(':', 1)[1].strip()",
+    "                    break",
+    "except Exception:",
+    "    pass",
+    "if not cpu_name:",
+    "    cpu_name = platform.processor() or platform.machine() or 'CPU'",
+    "devices.append({'mode':'cpu','name':cpu_name,'kind':'cpu','label':f'CPU - {cpu_name}'})",
+    "try:",
+    "    import torch",
+    "    if torch.cuda.is_available():",
+    "        gpu_name = torch.cuda.get_device_name(0)",
+    "        devices.append({'mode':'cuda','name':gpu_name,'kind':'gpu','label':f'GPU - {gpu_name}'})",
+    "    if platform.system().lower() == 'darwin' and getattr(torch.backends, 'mps', None) and torch.backends.mps.is_available():",
+    "        mps_name = 'Apple Silicon'",
+    "        devices.append({'mode':'mps','name':mps_name,'kind':'gpu','label':f'GPU - {mps_name}'})",
+    "except Exception:",
+    "    pass",
+    "print(json.dumps({'devices': devices}, ensure_ascii=True))"
+  ].join("\n");
+
+  return new Promise<SeparationDeviceInfo[]>((resolve) => {
+    const child = spawn(pythonCommand, ["-c", script], { stdio: ["ignore", "pipe", "ignore"] });
+    let stdout = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf8");
+    });
+    child.on("close", () => {
+      try {
+        const parsed = JSON.parse(stdout.trim()) as {
+          devices?: Array<{ mode?: string; name?: string; label?: string; kind?: string }>;
+        };
+        const normalized: SeparationDeviceInfo[] = (parsed.devices ?? [])
+          .filter((d) => d.mode === "cpu" || d.mode === "cuda" || d.mode === "mps")
+          .map((d) => ({
+            mode: d.mode as SeparationDeviceInfo["mode"],
+            name: String(d.name ?? ""),
+            label: String(d.label ?? d.name ?? d.mode),
+            kind: d.kind === "gpu" ? "gpu" : "cpu"
+          }));
+        if (normalized.length > 0) {
+          resolve(normalized);
+          return;
+        }
+      } catch {
+        /* fallthrough */
+      }
+      resolve([{ mode: "cpu", name: "CPU", label: "CPU - CPU", kind: "cpu" }]);
+    });
+    child.on("error", () => {
+      resolve([{ mode: "cpu", name: "CPU", label: "CPU - CPU", kind: "cpu" }]);
     });
   });
 };
@@ -583,6 +649,7 @@ app.whenReady().then(() => {
   createWindow();
 
   ipcMain.handle("separation:start", async (_event, request: StartSeparationRequest) => runSeparation(request));
+  ipcMain.handle("separation:devices", async () => listSeparationDevices());
   ipcMain.handle("output:open", async (_event, outputPath: string) => shell.openPath(outputPath));
 
   ipcMain.handle("youtube:start", async (_event, request: StartYoutubeDownloadRequest) =>

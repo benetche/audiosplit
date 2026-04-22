@@ -4,6 +4,7 @@ import type {
   EnvInfo,
   LibraryEntry,
   ProgressPayload,
+  SeparationDeviceInfo,
   StartSeparationRequest,
   StartSeparationResponse,
   StartYoutubeDownloadRequest,
@@ -18,6 +19,7 @@ declare global {
       getLocalFilePath: (file: File) => string | null;
       audioUrlFromPath: (absolutePath: string) => string;
       startSeparation: (request: StartSeparationRequest) => Promise<StartSeparationResponse>;
+      getSeparationDevices: () => Promise<SeparationDeviceInfo[]>;
       onProgress: (callback: (payload: ProgressPayload) => void) => () => void;
       openOutputFolder: (outputPath: string) => Promise<string>;
       startYoutubeDownload: (request: StartYoutubeDownloadRequest) => Promise<StartYoutubeDownloadResponse>;

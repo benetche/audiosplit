@@ -1,5 +1,14 @@
 export type SeparationDeviceMode = "auto" | "cuda" | "cpu" | "mps";
 
+export type SeparationDeviceInfo = {
+  mode: Exclude<SeparationDeviceMode, "auto">;
+  /** Label amigavel para UI, ex.: "CPU - AMD Ryzen..." */
+  label: string;
+  /** Nome bruto reportado pelo runtime/sistema */
+  name: string;
+  kind: "cpu" | "gpu";
+};
+
 export type ProgressPayload = {
   type: "status" | "progress" | "error" | "complete";
   message: string;
