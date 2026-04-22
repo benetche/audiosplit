@@ -1,12 +1,25 @@
-import { app, BrowserWindow, ipcMain, Menu, protocol, shell } from "electron";
-import { spawn } from "node:child_process";
+import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from "electron";
+import { spawn, type ChildProcess } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
-import type { ProgressPayload, SeparationDeviceMode, StartSeparationRequest, StartSeparationResponse } from "./types";
+import { randomUUID } from "node:crypto";
+import type {
+  DownloadAudioFormat,
+  ProgressPayload,
+  SeparationDeviceMode,
+  StartSeparationRequest,
+  StartSeparationResponse,
+  StartYoutubeDownloadRequest,
+  StartYoutubeDownloadResponse,
+  YoutubeProgressPayload
+} from "./types";
 
 const ALLOWED_EXTENSIONS = new Set([".mp3", ".wav", ".flac", ".m4a"]);
+const ALLOWED_DOWNLOAD_FORMATS = new Set<DownloadAudioFormat>(["mp3", "wav", "flac", "m4a"]);
 const PROCESS_TIMEOUT_MS = 1000 * 60 * 30;
+const DOWNLOAD_TIMEOUT_MS = 1000 * 60 * 20;
+const YOUTUBE_URL_RE = /^https?:\/\/(?:www\.|m\.|music\.)?(?:youtube\.com|youtu\.be)\/.+/i;
 
 const sanitizeFileName = (name: string): string =>
   name.normalize("NFKD").replace(/[^\w.\-]/g, "_");
@@ -33,7 +46,17 @@ const resolvePythonCommand = (): string => {
 
 const getEngineScriptPath = (): string => path.join(app.getAppPath(), "engine", "separator_core.py");
 
+const getYoutubeScriptPath = (): string => path.join(app.getAppPath(), "engine", "youtube_downloader.py");
+
 const getOutputRoot = (): string => path.join(app.getAppPath(), "output");
+
+const getDefaultDownloadDir = (): string => {
+  try {
+    return path.join(app.getPath("music"), "AudioSplit");
+  } catch {
+    return path.join(app.getAppPath(), "downloads");
+  }
+};
 
 /** Permite <audio src="audiosplit-local://..."> no renderer (Vite http) sem webSecurity false. */
 protocol.registerSchemesAsPrivileged([
@@ -76,6 +99,13 @@ let mainWindow: BrowserWindow | null = null;
 const sendProgress = (payload: ProgressPayload): void => {
   mainWindow?.webContents.send("separation:progress", payload);
 };
+
+const sendYoutubeProgress = (payload: YoutubeProgressPayload): void => {
+  mainWindow?.webContents.send("youtube:progress", payload);
+};
+
+/** Mantem referencia aos downloads ativos para suportar cancelamento. */
+const activeDownloads = new Map<string, ChildProcess>();
 
 const createWindow = (): void => {
   mainWindow = new BrowserWindow({
@@ -208,6 +238,141 @@ const runSeparation = async (request: StartSeparationRequest): Promise<StartSepa
   });
 };
 
+const runYoutubeDownload = async (
+  request: StartYoutubeDownloadRequest
+): Promise<StartYoutubeDownloadResponse> => {
+  const url = (request.url ?? "").trim();
+  const format = request.format;
+  const targetDirRaw = (request.outputDir ?? "").trim();
+
+  if (!YOUTUBE_URL_RE.test(url)) {
+    return { success: false, error: "URL do YouTube invalida." };
+  }
+  if (!ALLOWED_DOWNLOAD_FORMATS.has(format)) {
+    return { success: false, error: "Formato de audio nao suportado." };
+  }
+
+  const outputDir = path.normalize(targetDirRaw.length > 0 ? targetDirRaw : getDefaultDownloadDir());
+  try {
+    await fs.mkdir(outputDir, { recursive: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: `Nao foi possivel criar a pasta de destino: ${message}` };
+  }
+
+  const jobId = randomUUID();
+  const pythonCommand = resolvePythonCommand();
+  const youtubeScript = getYoutubeScriptPath();
+
+  return new Promise<StartYoutubeDownloadResponse>((resolve) => {
+    const child = spawn(
+      pythonCommand,
+      ["-u", youtubeScript, "--url", url, "--output-dir", outputDir, "--format", format, "--job-id", jobId],
+      { stdio: ["ignore", "pipe", "pipe"] }
+    );
+    activeDownloads.set(jobId, child);
+
+    let stderrBuffer = "";
+    let completedFilePath: string | undefined;
+    let completedTitle: string | undefined;
+    let reportedError: string | undefined;
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      const lines = chunk
+        .toString("utf8")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      for (const line of lines) {
+        try {
+          const payload = JSON.parse(line) as YoutubeProgressPayload;
+          if (payload.type === "complete" && typeof payload.filePath === "string") {
+            completedFilePath = payload.filePath;
+            completedTitle = payload.title;
+          }
+          if (payload.type === "error" && typeof payload.message === "string") {
+            reportedError = payload.message;
+          }
+          sendYoutubeProgress({ ...payload, jobId });
+        } catch {
+          sendYoutubeProgress({ type: "status", message: line, jobId });
+        }
+      }
+    });
+
+    child.stderr.on("data", (chunk: Buffer) => {
+      const message = chunk.toString("utf8");
+      stderrBuffer += message;
+    });
+
+    const timeoutHandle = setTimeout(() => {
+      child.kill("SIGTERM");
+      sendYoutubeProgress({
+        type: "error",
+        message: "Download excedeu o tempo limite e foi encerrado.",
+        jobId
+      });
+    }, DOWNLOAD_TIMEOUT_MS);
+
+    child.on("error", (err) => {
+      reportedError = reportedError ?? err.message;
+      sendYoutubeProgress({ type: "error", message: err.message, jobId });
+    });
+
+    child.on("close", (code, signal) => {
+      clearTimeout(timeoutHandle);
+      activeDownloads.delete(jobId);
+
+      if (signal === "SIGTERM") {
+        resolve({ success: false, jobId, error: reportedError ?? "Download cancelado." });
+        return;
+      }
+
+      if (code !== 0 || !completedFilePath) {
+        resolve({
+          success: false,
+          jobId,
+          outputDir,
+          error:
+            reportedError ??
+            stderrBuffer.trim() ??
+            `Processo Python encerrou com codigo ${String(code)}.`
+        });
+        return;
+      }
+
+      resolve({
+        success: true,
+        jobId,
+        outputDir,
+        filePath: completedFilePath,
+        title: completedTitle
+      });
+    });
+  });
+};
+
+const cancelYoutubeDownload = (jobId: string): boolean => {
+  const child = activeDownloads.get(jobId);
+  if (!child) return false;
+  child.kill("SIGTERM");
+  activeDownloads.delete(jobId);
+  return true;
+};
+
+const chooseDownloadDirectory = async (): Promise<string | null> => {
+  if (!mainWindow) return null;
+  const defaultPath = getDefaultDownloadDir();
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Escolher pasta de download",
+    defaultPath,
+    properties: ["openDirectory", "createDirectory"]
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return result.filePaths[0] ?? null;
+};
+
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   registerLocalAudioProtocol();
@@ -216,6 +381,13 @@ app.whenReady().then(() => {
 
   ipcMain.handle("separation:start", async (_event, request: StartSeparationRequest) => runSeparation(request));
   ipcMain.handle("output:open", async (_event, outputPath: string) => shell.openPath(outputPath));
+
+  ipcMain.handle("youtube:start", async (_event, request: StartYoutubeDownloadRequest) =>
+    runYoutubeDownload(request)
+  );
+  ipcMain.handle("youtube:cancel", async (_event, jobId: string) => cancelYoutubeDownload(jobId));
+  ipcMain.handle("youtube:choose-directory", async () => chooseDownloadDirectory());
+  ipcMain.handle("youtube:default-directory", async () => getDefaultDownloadDir());
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

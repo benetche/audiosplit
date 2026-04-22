@@ -17,6 +17,8 @@ export type AppState = {
   stems: StemItem[];
   /** true = canal mutado (sem contribuicao no mix) */
   mutedChannels: Record<MixerChannel, boolean>;
+  /** Ultima pasta escolhida para downloads nesta sessao (nao persistida em disco). */
+  lastDownloadDir: string;
   setFile: (path: string, name: string) => void;
   setDeviceMode: (mode: SeparationDeviceMode) => void;
   appendLog: (entry: string) => void;
@@ -24,4 +26,5 @@ export type AppState = {
   setProcessing: (processing: boolean) => void;
   applyProgress: (payload: ProgressPayload) => void;
   toggleChannelMute: (channel: MixerChannel) => void;
+  setLastDownloadDir: (dir: string) => void;
 };

@@ -1,3 +1,4 @@
+import { YouTubeDownloadPanel } from "./components/download/YouTubeDownloadPanel";
 import { AppHeader } from "./components/layout/AppHeader";
 import { AppShell } from "./components/layout/AppShell";
 import { LogsPanel } from "./components/logs/LogsPanel";
@@ -12,6 +13,7 @@ function App() {
   return (
     <AppShell>
       <AppHeader />
+      <YouTubeDownloadPanel />
       <SeparationPanel />
       <SeparationProgress />
       <MixerSection />

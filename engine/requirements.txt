@@ -3,3 +3,4 @@ torch
 onnxruntime-gpu
 soundfile
 numpy
+yt-dlp

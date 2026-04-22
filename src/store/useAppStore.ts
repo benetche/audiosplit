@@ -12,7 +12,9 @@ export const useAppStore = create<AppState>((set) => ({
   outputDir: "",
   stems: [],
   mutedChannels: initialMutedChannels(),
+  lastDownloadDir: "",
   setFile: (selectedFilePath, selectedFileName) => set({ selectedFilePath, selectedFileName }),
+  setLastDownloadDir: (lastDownloadDir) => set({ lastDownloadDir }),
   setDeviceMode: (deviceMode) => set({ deviceMode }),
   appendLog: (entry) => set((state) => ({ logs: [...state.logs, entry] })),
   resetJob: () =>
