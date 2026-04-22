@@ -28,12 +28,11 @@
     "zustand": "latest"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.2.2",
+    "@tailwindcss/vite": "^4.2.4",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "latest",
-    "autoprefixer": "latest",
     "concurrently": "latest",
     "cross-env": "latest",
     "electron": "latest",
