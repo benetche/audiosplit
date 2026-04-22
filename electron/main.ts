@@ -9,7 +9,6 @@ import type {
   LibraryEntry,
   ProgressPayload,
   SeparationDeviceInfo,
-  SeparationDeviceInfo,
   SeparationDeviceMode,
   StartSeparationRequest,
   StartSeparationResponse,
