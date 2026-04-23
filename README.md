@@ -17,7 +17,7 @@ Current default model: `htdemucs_6s.yaml` (Demucs 6 stems), generating channels 
 - React + TypeScript + Vite
 - Tailwind CSS
 - Zustand (state management)
-- Python 3.10+ (`audio-separator`, PyTorch, ONNX Runtime for `.onnx` models)
+- Python 3.10+ managed with `uv` (`audio-separator`, PyTorch, ONNX Runtime for `.onnx` models)
 
 ## Quick Start
 
@@ -29,15 +29,27 @@ cd AudioSplit
 npm install
 ```
 
-### 2) Setup Python virtual environment
+### 2) Install `uv` and sync the Python sidecar
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r engine/requirements.txt
+If you do not have `uv` yet, install it using the official instructions:
+
+```text
+https://docs.astral.sh/uv/getting-started/installation/
 ```
 
-The Electron app automatically tries `.venv/bin/python` (Linux/macOS) or `.venv\Scripts\python.exe` (Windows).  
+Optional: if you want `uv` to install the managed Python version used by this project, run:
+
+```bash
+uv python install
+```
+
+Then sync the Python sidecar:
+
+```bash
+uv sync
+```
+
+`uv sync` creates the project `.venv` automatically. The Electron app then tries `.venv/bin/python` (Linux/macOS) or `.venv\Scripts\python.exe` (Windows).  
 Fallback is `python3` from your system.
 
 ### 3) Install FFmpeg (system dependency)
@@ -100,7 +112,7 @@ The "YouTube download" panel uses the Python sidecar with [`yt-dlp`](https://git
 
 Requirements:
 
-- `yt-dlp` installed in the venv (already listed in `engine/requirements.txt`). Reinstall when updating: `pip install -r engine/requirements.txt`.
+- `uv sync` already installs `yt-dlp` and the rest of the Python sidecar dependencies into `.venv`.
 - FFmpeg on the PATH (same requirement as the separation flow).
 
 Usage:

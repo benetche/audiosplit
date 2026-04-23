@@ -11,18 +11,29 @@ Be respectful and constructive in all interactions. Assume good intent and focus
 ### Requirements
 
 - Node.js 18+ and npm
-- Python 3.10+
+- `uv`
+- Python 3.10+ (installed locally or managed by `uv`)
 - FFmpeg installed in your system PATH
 
 ### Setup steps
+
+Install `uv` first if needed:
+
+```text
+https://docs.astral.sh/uv/getting-started/installation/
+```
 
 ```bash
 git clone <your-fork-url>
 cd AudioSplit
 npm install
-python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r engine/requirements.txt
+uv sync
+```
+
+If `uv` needs to install the managed Python version for this project first:
+
+```bash
+uv python install
 ```
 
 Run in development:
