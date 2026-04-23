@@ -1,4 +1,4 @@
-import { Download, Library, type LucideIcon, Settings } from "lucide-react";
+import { Library, type LucideIcon, Settings, SlidersHorizontal } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import type { AppView } from "../../store/useAppStore";
 
@@ -9,7 +9,7 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "download", label: "Explorar", icon: Download },
+  { id: "download", label: "Mixer", icon: SlidersHorizontal },
   { id: "library", label: "Biblioteca", icon: Library },
   { id: "settings", label: "Config", icon: Settings }
 ];

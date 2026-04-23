@@ -28,11 +28,9 @@ export function LibraryView() {
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
             <LibraryIcon className="h-6 w-6 text-accent" strokeWidth={1.75} />
-            Biblioteca de stems
+            Sua Biblioteca
           </h1>
-          <p className="mt-1 text-sm text-text-secondary">
-            Separacoes ja feitas ficam salvas no diretorio <span className="mono">output/</span>.
-          </p>
+          
         </div>
         <button
           type="button"
@@ -77,7 +75,7 @@ function EmptyState() {
         <FolderSearch className="h-6 w-6" strokeWidth={1.5} />
       </div>
       <p className="max-w-sm text-sm text-text-secondary">
-        Nada por aqui ainda. Separe sua primeira musica na aba Explorar para comecar a mixar.
+        Vazio.
       </p>
     </div>
   );

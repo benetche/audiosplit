@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { SlidersHorizontal, Sparkles } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { LogsPanel } from "../logs/LogsPanel";
 import { MixerSection } from "../mixer/MixerSection";
@@ -14,10 +14,10 @@ export function DownloadView() {
   return (
     <section className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Explorar e baixar</h1>
-        <p className="text-sm text-text-secondary">
-          Cole um link do YouTube ou arraste um arquivo para separar em stems.
-        </p>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+          <SlidersHorizontal className="h-6 w-6 text-accent" strokeWidth={1.75} />
+          Mixer
+        </h1>
       </header>
 
       <YouTubeDownloadPanel />

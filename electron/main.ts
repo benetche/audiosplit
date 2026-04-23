@@ -1,9 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { pathToFileURL } from "node:url";
 import type {
   DownloadAudioFormat,
   LibraryEntry,
@@ -78,22 +79,20 @@ const isPathUnderOutputRoot = (absFile: string): boolean => {
 };
 
 const registerLocalAudioProtocol = (): void => {
-  protocol.registerFileProtocol("audiosplit-local", (request, callback) => {
+  protocol.handle("audiosplit-local", (request) => {
     try {
       const u = new URL(request.url);
       const raw = u.searchParams.get("p");
       if (!raw) {
-        callback({ error: -2 });
-        return;
+        return new Response("Missing path parameter.", { status: 400 });
       }
       const abs = path.normalize(decodeURIComponent(raw));
       if (!existsSync(abs) || !isPathUnderOutputRoot(abs)) {
-        callback({ error: -6 });
-        return;
+        return new Response("File not found.", { status: 404 });
       }
-      callback({ path: abs });
+      return net.fetch(pathToFileURL(abs).toString());
     } catch {
-      callback({ error: -2 });
+      return new Response("Invalid request.", { status: 400 });
     }
   });
 };
