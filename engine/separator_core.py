@@ -41,7 +41,12 @@ def apply_device_env(mode: DeviceMode) -> None:
             os.environ["CUDA_VISIBLE_DEVICES"] = "0"
         return
     if mode == "mps" and platform.system().lower() != "darwin":
-        emit({"type": "status", "message": "Modo mps ignorado (use apenas no macOS); usando auto."})
+        emit(
+            {
+                "type": "status",
+                "message": "Modo mps ignorado (use apenas no macOS); usando auto.",
+            }
+        )
     # auto / mps(darwin): não mexer aqui
 
 
@@ -51,7 +56,11 @@ def detect_device() -> str:
 
         if torch.cuda.is_available():
             return "cuda"
-        if platform.system().lower() == "darwin" and getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        if (
+            platform.system().lower() == "darwin"
+            and getattr(torch.backends, "mps", None)
+            and torch.backends.mps.is_available()
+        ):
             return "mps"
     except Exception:
         pass
@@ -67,18 +76,37 @@ def emit_runtime_diagnostics() -> None:
             {
                 "type": "status",
                 "message": f"PyTorch CUDA disponivel: {torch.cuda.is_available()}"
-                + (f" (device {torch.cuda.get_device_name(0)})" if torch.cuda.is_available() else ""),
+                + (
+                    f" (device {torch.cuda.get_device_name(0)})"
+                    if torch.cuda.is_available()
+                    else ""
+                ),
             }
         )
     except Exception as exc:
-        emit({"type": "status", "message": f"PyTorch: nao foi possivel inspecionar ({exc})"})
+        emit(
+            {
+                "type": "status",
+                "message": f"PyTorch: nao foi possivel inspecionar ({exc})",
+            }
+        )
 
     try:
         import onnxruntime as ort
 
-        emit({"type": "status", "message": f"ONNX Runtime providers: {ort.get_available_providers()}"})
+        emit(
+            {
+                "type": "status",
+                "message": f"ONNX Runtime providers: {ort.get_available_providers()}",
+            }
+        )
     except Exception as exc:
-        emit({"type": "status", "message": f"ONNX Runtime: nao foi possivel inspecionar ({exc})"})
+        emit(
+            {
+                "type": "status",
+                "message": f"ONNX Runtime: nao foi possivel inspecionar ({exc})",
+            }
+        )
 
 
 def ensure_audio_separator() -> None:
@@ -90,8 +118,7 @@ def ensure_audio_separator() -> None:
                 "type": "error",
                 "message": (
                     "Pacote 'audio-separator' nao instalado neste Python. "
-                    "Crie a venv na raiz do projeto e instale: "
-                    "python3 -m venv .venv && .venv/bin/pip install -r engine/requirements.txt"
+                    "Na raiz do projeto, rode 'uv sync' para criar/sincronizar a .venv e tente novamente."
                 ),
             }
         )
@@ -121,7 +148,9 @@ def default_model_dir() -> Path:
     return d
 
 
-def run_separator(input_path: str, output_dir: str, device: str, device_mode: DeviceMode) -> list[str]:
+def run_separator(
+    input_path: str, output_dir: str, device: str, device_mode: DeviceMode
+) -> list[str]:
     from audio_separator.separator import Separator
 
     model_dir = default_model_dir()
@@ -134,7 +163,12 @@ def run_separator(input_path: str, output_dir: str, device: str, device_mode: De
 
     onnx_ep = getattr(separator, "onnx_execution_provider", None)
     torch_dev = getattr(separator, "torch_device", None)
-    emit({"type": "status", "message": f"Inferencia ativa: torch={torch_dev}, onnx_providers={onnx_ep}"})
+    emit(
+        {
+            "type": "status",
+            "message": f"Inferencia ativa: torch={torch_dev}, onnx_providers={onnx_ep}",
+        }
+    )
 
     # Demucs usa PyTorch; ONNX so entra em modelos MDX (.onnx). Nao falhar cuda por ONNX em CPU aqui.
     model_name = "htdemucs_6s.yaml"
@@ -146,8 +180,8 @@ def run_separator(input_path: str, output_dir: str, device: str, device_mode: De
     ):
         raise RuntimeError(
             "GPU solicitada, mas ONNX Runtime so expoe CPUExecutionProvider. "
-            "Instale driver NVIDIA; remova o pacote 'onnxruntime' se existir (pip uninstall onnxruntime) "
-            "e mantenha apenas onnxruntime-gpu; verifique: python -c \"import onnxruntime as ort; print(ort.get_available_providers())\""
+            "Instale driver NVIDIA; remova qualquer pacote 'onnxruntime' conflitante na .venv "
+            'e mantenha apenas onnxruntime-gpu; verifique com: uv run python -c "import onnxruntime as ort; print(ort.get_available_providers())"'
         )
     emit(
         {
@@ -158,19 +192,38 @@ def run_separator(input_path: str, output_dir: str, device: str, device_mode: De
     )
     separator.load_model(model_filename=model_name)
 
-    emit({"type": "progress", "message": "Running separation", "progress": 35, "device": device})
+    emit(
+        {
+            "type": "progress",
+            "message": "Running separation",
+            "progress": 35,
+            "device": device,
+        }
+    )
     output_files = separator.separate(input_path)
 
     stems: list[str] = []
     if isinstance(output_files, list):
         stems = [str(Path(item)) for item in output_files]
-    emit({"type": "progress", "message": "Post-processing stems", "progress": 90, "device": device, "stems": stems})
+    emit(
+        {
+            "type": "progress",
+            "message": "Post-processing stems",
+            "progress": 90,
+            "device": device,
+            "stems": stems,
+        }
+    )
     return stems
 
 
 def is_gpu_oom(exc: Exception) -> bool:
     msg = str(exc).lower()
-    return "cuda out of memory" in msg or "cudnn_status_alloc_failed" in msg or "out of memory" in msg
+    return (
+        "cuda out of memory" in msg
+        or "cudnn_status_alloc_failed" in msg
+        or "out of memory" in msg
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -197,7 +250,13 @@ def main() -> int:
     device_mode: DeviceMode = args.device
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-    emit({"type": "status", "message": f"Engine started (device mode: {device_mode})", "jobId": job_id})
+    emit(
+        {
+            "type": "status",
+            "message": f"Engine started (device mode: {device_mode})",
+            "jobId": job_id,
+        }
+    )
 
     ensure_audio_separator()
     ensure_ffmpeg()
@@ -205,7 +264,14 @@ def main() -> int:
     emit_runtime_diagnostics()
 
     device = detect_device()
-    emit({"type": "status", "message": f"Detected device: {device}", "jobId": job_id, "device": device})
+    emit(
+        {
+            "type": "status",
+            "message": f"Detected device: {device}",
+            "jobId": job_id,
+            "device": device,
+        }
+    )
 
     if device_mode == "cuda" and device != "cuda":
         emit(
@@ -213,7 +279,7 @@ def main() -> int:
                 "type": "error",
                 "message": (
                     "Modo cuda solicitado, mas PyTorch nao ve GPU (torch.cuda.is_available() == False). "
-                    "Verifique driver NVIDIA, nvidia-smi, e se o PyTorch na venv e build CUDA (ex.: pip install torch --index-url https://download.pytorch.org/whl/cu124)."
+                    "Verifique driver NVIDIA, nvidia-smi, e se o PyTorch na .venv usa uma build CUDA compativel."
                 ),
             }
         )
@@ -279,7 +345,14 @@ def main() -> int:
                 traceback.print_exc()
                 return 1
 
-        emit({"type": "error", "message": f"Separation failed: {exc}", "jobId": job_id, "device": device})
+        emit(
+            {
+                "type": "error",
+                "message": f"Separation failed: {exc}",
+                "jobId": job_id,
+                "device": device,
+            }
+        )
         traceback.print_exc()
         return 1
 

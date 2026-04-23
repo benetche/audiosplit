@@ -36,7 +36,7 @@ def ensure_yt_dlp() -> None:
                 "type": "error",
                 "message": (
                     "Pacote 'yt-dlp' nao instalado neste Python. "
-                    "Instale com: .venv/bin/pip install -r engine/requirements.txt"
+                    "Na raiz do projeto, rode 'uv sync' para criar/sincronizar a .venv e tente novamente."
                 ),
             }
         )
@@ -89,12 +89,22 @@ def build_progress_hooks(job_id: str) -> tuple[Any, Any]:
         if status == "downloading":
             if not state["announced_download"]:
                 state["announced_download"] = True
-                emit({"type": "status", "message": "Baixando audio do YouTube...", "jobId": job_id})
+                emit(
+                    {
+                        "type": "status",
+                        "message": "Baixando audio do YouTube...",
+                        "jobId": job_id,
+                    }
+                )
 
             percent: float | None = None
             total = d.get("total_bytes") or d.get("total_bytes_estimate")
             downloaded = d.get("downloaded_bytes")
-            if isinstance(total, (int, float)) and total > 0 and isinstance(downloaded, (int, float)):
+            if (
+                isinstance(total, (int, float))
+                and total > 0
+                and isinstance(downloaded, (int, float))
+            ):
                 percent = max(0.0, min(100.0, (downloaded / total) * 100.0))
             elif isinstance(d.get("_percent_str"), str):
                 percent = _clean_percent(d["_percent_str"])
@@ -146,7 +156,9 @@ def build_progress_hooks(job_id: str) -> tuple[Any, Any]:
     return download_hook, postprocessor_hook
 
 
-def run_download(url: str, output_dir: str, audio_format: SupportedFormat, job_id: str) -> str:
+def run_download(
+    url: str, output_dir: str, audio_format: SupportedFormat, job_id: str
+) -> str:
     import yt_dlp
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -233,7 +245,9 @@ def run_preview(url: str, job_id: str) -> dict[str, Any]:
     for t in thumbnails:
         if not t.get("url"):
             continue
-        if best_thumb is None or (t.get("height") or 0) > (best_thumb.get("height") or 0):
+        if best_thumb is None or (t.get("height") or 0) > (
+            best_thumb.get("height") or 0
+        ):
             best_thumb = t
     thumbnail_url = (best_thumb or {}).get("url") or info.get("thumbnail")
 
@@ -267,15 +281,33 @@ def main() -> int:
             emit({"type": "preview", **info})
             return 0
         except Exception as exc:  # noqa: BLE001
-            emit({"type": "error", "message": f"Falha no preview: {exc}", "jobId": job_id})
+            emit(
+                {
+                    "type": "error",
+                    "message": f"Falha no preview: {exc}",
+                    "jobId": job_id,
+                }
+            )
             traceback.print_exc()
             return 1
 
     if not output_dir:
-        emit({"type": "error", "message": "--output-dir obrigatorio para download.", "jobId": job_id})
+        emit(
+            {
+                "type": "error",
+                "message": "--output-dir obrigatorio para download.",
+                "jobId": job_id,
+            }
+        )
         return 1
 
-    emit({"type": "status", "message": f"YouTube downloader iniciado (format: {audio_format})", "jobId": job_id})
+    emit(
+        {
+            "type": "status",
+            "message": f"YouTube downloader iniciado (format: {audio_format})",
+            "jobId": job_id,
+        }
+    )
     ensure_ffmpeg()
 
     try:

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ativa o Python virtualenv na raiz do projeto (.venv).
+# Ativa a .venv na raiz do projeto (gerenciada por uv).
 # Uso (no shell atual):  source scripts/activate-venv.sh
 # Não use ./scripts/activate-venv.sh — o ambiente só vale no processo que fez source.
 
@@ -14,7 +14,7 @@ ACTIVATE="$ROOT/.venv/bin/activate"
 
 if [[ ! -f "$ACTIVATE" ]]; then
   echo "Ambiente não encontrado: $ACTIVATE" >&2
-  echo "Crie com: python3 -m venv .venv && .venv/bin/pip install -r engine/requirements.txt" >&2
+  echo "Crie com: uv sync" >&2
   return 1
 fi
 

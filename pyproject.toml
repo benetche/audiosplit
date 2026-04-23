@@ -1,0 +1,16 @@
+[project]
+name = "audiosplit-engine"
+version = "0.1.0"
+description = "Python sidecar for AudioSplit"
+requires-python = ">=3.10"
+dependencies = [
+  "audio-separator",
+  "torch",
+  "onnxruntime-gpu<1.24",
+  "soundfile",
+  "numpy",
+  "yt-dlp",
+]
+
+[tool.uv]
+package = false

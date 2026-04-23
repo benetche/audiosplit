@@ -30,7 +30,7 @@ const sanitizeFileName = (name: string): string =>
   name.normalize("NFKD").replace(/[^\w.\-]/g, "_");
 
 /**
- * Usa PYTHON_EXECUTABLE se definido; senão tenta `.venv` do projeto (onde costuma estar o `pip install`);
+ * Usa PYTHON_EXECUTABLE se definido; senao tenta `.venv` do projeto (criado via `uv sync`);
  * por último cai no `python3` do PATH (pode não ter audio-separator).
  */
 const resolvePythonCommand = (): string => {
