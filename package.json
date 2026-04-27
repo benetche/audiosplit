@@ -51,6 +51,7 @@
       "dist-electron/**",
       "electron/**",
       "engine/**",
+      "!engine/models/**",
       "package.json"
     ],
     "directories": {

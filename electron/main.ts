@@ -109,6 +109,12 @@ const sendYoutubeProgress = (payload: YoutubeProgressPayload): void => {
 
 /** Mantem referencia aos downloads ativos para suportar cancelamento. */
 const activeDownloads = new Map<string, ChildProcess>();
+const DEVICE_CACHE_TTL_MS = 1000 * 60 * 5;
+const DEVICE_DETECTION_TIMEOUT_MS = 1000 * 15;
+const FALLBACK_DEVICES: SeparationDeviceInfo[] = [{ mode: "cpu", name: "CPU", label: "CPU - CPU", kind: "cpu" }];
+
+let deviceCache: { devices: SeparationDeviceInfo[]; expiresAt: number } | null = null;
+let pendingDeviceDetection: Promise<SeparationDeviceInfo[]> | null = null;
 
 const createWindow = (): void => {
   mainWindow = new BrowserWindow({
@@ -255,7 +261,7 @@ const runSeparation = async (request: StartSeparationRequest): Promise<StartSepa
   });
 };
 
-const listSeparationDevices = async (): Promise<SeparationDeviceInfo[]> => {
+const detectSeparationDevices = async (): Promise<SeparationDeviceInfo[]> => {
   const pythonCommand = resolvePythonCommand();
   const script = [
     "import json, platform",
@@ -289,10 +295,15 @@ const listSeparationDevices = async (): Promise<SeparationDeviceInfo[]> => {
   return new Promise<SeparationDeviceInfo[]>((resolve) => {
     const child = spawn(pythonCommand, ["-c", script], { stdio: ["ignore", "pipe", "ignore"] });
     let stdout = "";
+    const timeoutHandle = setTimeout(() => {
+      child.kill("SIGTERM");
+      resolve(FALLBACK_DEVICES);
+    }, DEVICE_DETECTION_TIMEOUT_MS);
     child.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk.toString("utf8");
     });
     child.on("close", () => {
+      clearTimeout(timeoutHandle);
       try {
         const parsed = JSON.parse(stdout.trim()) as {
           devices?: Array<{ mode?: string; name?: string; label?: string; kind?: string }>;
@@ -312,12 +323,34 @@ const listSeparationDevices = async (): Promise<SeparationDeviceInfo[]> => {
       } catch {
         // ignore parse failures and fallback
       }
-      resolve([{ mode: "cpu", name: "CPU", label: "CPU - CPU", kind: "cpu" }]);
+      resolve(FALLBACK_DEVICES);
     });
     child.on("error", () => {
-      resolve([{ mode: "cpu", name: "CPU", label: "CPU - CPU", kind: "cpu" }]);
+      clearTimeout(timeoutHandle);
+      resolve(FALLBACK_DEVICES);
     });
   });
+};
+
+const listSeparationDevices = async (): Promise<SeparationDeviceInfo[]> => {
+  const now = Date.now();
+  if (deviceCache && deviceCache.expiresAt > now) {
+    return deviceCache.devices;
+  }
+  if (pendingDeviceDetection) {
+    return pendingDeviceDetection;
+  }
+
+  pendingDeviceDetection = detectSeparationDevices()
+    .then((devices) => {
+      deviceCache = { devices, expiresAt: Date.now() + DEVICE_CACHE_TTL_MS };
+      return devices;
+    })
+    .finally(() => {
+      pendingDeviceDetection = null;
+    });
+
+  return pendingDeviceDetection;
 };
 
 const runYoutubeDownload = async (
@@ -504,6 +537,27 @@ const cancelYoutubeDownload = (jobId: string): boolean => {
 
 const AUDIO_EXT_RE = /\.(wav|mp3|flac|m4a|aiff|aif|ogg)$/i;
 const JOB_ID_SUFFIX_RE = /_[0-9a-f-]{8,}$/i;
+const LIBRARY_LIST_CONCURRENCY = 8;
+
+const readLibraryEntry = async (root: string, dirent: import("node:fs").Dirent): Promise<LibraryEntry | null> => {
+  const fullPath = path.join(root, dirent.name);
+  try {
+    const [childStat, files] = await Promise.all([fs.stat(fullPath), fs.readdir(fullPath)]);
+    const stemFiles = files.filter((f) => AUDIO_EXT_RE.test(f)).sort();
+    if (stemFiles.length === 0) return null;
+
+    const displayName = dirent.name.replace(JOB_ID_SUFFIX_RE, "");
+    return {
+      id: dirent.name,
+      name: displayName || dirent.name,
+      path: fullPath,
+      createdAt: childStat.mtime.toISOString(),
+      stems: stemFiles.map((f) => path.join(fullPath, f))
+    };
+  } catch {
+    return null;
+  }
+};
 
 const listLibraryEntries = async (): Promise<LibraryEntry[]> => {
   const root = getOutputRoot();
@@ -515,28 +569,21 @@ const listLibraryEntries = async (): Promise<LibraryEntry[]> => {
     return [];
   }
 
+  const directories = dirents.filter((dirent) => dirent.isDirectory());
   const entries: LibraryEntry[] = [];
-  for (const dirent of dirents) {
-    if (!dirent.isDirectory()) continue;
-    const fullPath = path.join(root, dirent.name);
-    try {
-      const childStat = await fs.stat(fullPath);
-      const stemFiles = (await fs.readdir(fullPath))
-        .filter((f) => AUDIO_EXT_RE.test(f))
-        .sort();
-      if (stemFiles.length === 0) continue;
-      const displayName = dirent.name.replace(JOB_ID_SUFFIX_RE, "");
-      entries.push({
-        id: dirent.name,
-        name: displayName || dirent.name,
-        path: fullPath,
-        createdAt: childStat.mtime.toISOString(),
-        stems: stemFiles.map((f) => path.join(fullPath, f))
-      });
-    } catch {
-      /* ignorar entradas ilegiveis */
-    }
-  }
+  let nextIndex = 0;
+  const workerCount = Math.min(LIBRARY_LIST_CONCURRENCY, directories.length);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < directories.length) {
+        const dirent = directories[nextIndex];
+        nextIndex += 1;
+        const entry = await readLibraryEntry(root, dirent);
+        if (entry) entries.push(entry);
+      }
+    })
+  );
 
   entries.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   return entries;
