@@ -85,6 +85,101 @@ Build production artifacts:
 npm run build
 ```
 
+## Running with Docker (alternative to venv)
+
+If installing the Python engine in a local venv is failing on your machine (PyTorch, `audio-separator`, and `onnxruntime` can be tricky depending on Python/OS combinations), you can run only the Python backend inside Docker while keeping Electron on the host.
+
+### Requirements
+
+- Docker Desktop (Windows/macOS) or Docker Engine + the `docker compose` plugin (Linux).
+- For GPU mode: an NVIDIA GPU + the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). On Windows that means Docker Desktop with the WSL2 backend and GPU compute enabled.
+
+### One-time setup (CPU)
+
+```bash
+# Folders used as volume mounts
+mkdir -p inputs music output
+
+# Build the engine image (3-8 min on first run)
+docker compose --profile cpu build
+
+# Start the engine container as a long-lived daemon
+docker compose --profile cpu up -d engine-cpu
+```
+
+### Wire Electron to the container
+
+The Electron app reads `PYTHON_EXECUTABLE` to locate Python. Point it at the wrapper script for your OS — the wrapper forwards every call to `docker exec` and translates host paths to container paths transparently (project root and your home directory are both mounted).
+
+**Linux / macOS / WSL:**
+
+```bash
+export PYTHON_EXECUTABLE="$PWD/scripts/python-docker.sh"
+npm run dev
+```
+
+**Windows (PowerShell):**
+
+```powershell
+$env:PYTHON_EXECUTABLE = "$PWD\scripts\python-docker.cmd"
+npm run dev
+```
+
+**Windows (cmd):**
+
+```cmd
+set PYTHON_EXECUTABLE=%CD%\scripts\python-docker.cmd
+npm run dev
+```
+
+The wrapper will auto-start the container if it isn't running. You can pick audio files from anywhere under your home directory (`Downloads`, `Music`, `Desktop`, OneDrive, etc.); paths outside the home or project root are not visible to the container.
+
+#### Shortcut scripts
+
+To avoid setting `PYTHON_EXECUTABLE` every session, the repo ships with launcher scripts that wire it up and start the dev server in one go:
+
+```bash
+# Linux / macOS / WSL
+./dev-docker.sh
+
+# Windows (PowerShell)
+.\dev-docker.ps1
+```
+
+Set `AUDIOSPLIT_DOCKER_PROFILE=gpu` before running the launcher to use the GPU profile.
+
+### GPU mode
+
+```bash
+docker compose --profile gpu build
+docker compose --profile gpu up -d engine-gpu
+
+# Tell the wrapper to target the GPU profile/service
+export AUDIOSPLIT_DOCKER_PROFILE=gpu   # PowerShell: $env:AUDIOSPLIT_DOCKER_PROFILE = "gpu"
+
+export PYTHON_EXECUTABLE="$PWD/scripts/python-docker.sh"   # or the .cmd on Windows
+npm run dev
+```
+
+### Running the engine via CLI (no UI)
+
+Handy for sanity-checks without launching Electron. Drop an audio file into `./inputs/` first:
+
+```bash
+docker compose exec engine-cpu python engine/separator_core.py \
+  --input /app/inputs/song.mp3 \
+  --output-dir /app/output/song \
+  --job-id test \
+  --device cpu
+```
+
+### Caveats
+
+- The first separation downloads ~1.5–2 GB of Demucs model weights into a named volume (`audiosplit-models`) and reuses it on subsequent runs.
+- Cancellation from the UI may not propagate cleanly into the container; if a separation looks stuck, `docker compose restart engine-cpu`.
+- After editing `docker-compose.yml` (e.g., adding mounts), recreate the container with `docker compose --profile cpu up -d --force-recreate engine-cpu` so the new config takes effect.
+- If `PYTHON_EXECUTABLE` is unset, Electron falls back to `.venv` and then `python3` from `PATH` — Docker is fully opt-in and does not affect existing venv setups.
+
 ## Feature Guide (Quick)
 
 - **Audio separation job:** choose an audio file and run stem separation.

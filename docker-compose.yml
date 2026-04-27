@@ -1,0 +1,50 @@
+services:
+  engine-cpu:
+    profiles: ["cpu"]
+    build:
+      context: .
+      dockerfile: engine/Dockerfile
+    image: audiosplit-engine:cpu
+    container_name: audiosplit-engine
+    command: ["sleep", "infinity"]
+    init: true
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./engine:/app/engine
+      - ./output:/app/output
+      - ./inputs:/app/inputs
+      - ./music:/app/music
+      - audiosplit-models:/app/engine/models
+      - ${USERPROFILE:-${HOME}}:/host/home
+
+  engine-gpu:
+    profiles: ["gpu"]
+    build:
+      context: .
+      dockerfile: engine/Dockerfile.gpu
+    image: audiosplit-engine:gpu
+    container_name: audiosplit-engine
+    command: ["sleep", "infinity"]
+    init: true
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./engine:/app/engine
+      - ./output:/app/output
+      - ./inputs:/app/inputs
+      - ./music:/app/music
+      - audiosplit-models:/app/engine/models
+      - ${USERPROFILE:-${HOME}}:/host/home
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: ["gpu"]
+
+volumes:
+  audiosplit-models:

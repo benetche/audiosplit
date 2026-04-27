@@ -1,10 +1,9 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { pathToFileURL } from "node:url";
 import type {
   DownloadAudioFormat,
   LibraryEntry,
@@ -49,6 +48,22 @@ const resolvePythonCommand = (): string => {
   return "python3";
 };
 
+/**
+ * Constroi (command, args) para spawn() suportando wrappers .cmd/.bat no Windows.
+ * Node 18.20.2+ recusa spawn direto desses arquivos (CVE-2024-27980), entao
+ * envolvemos em "cmd.exe /d /s /c <wrapper> ...args" quando necessario.
+ */
+const buildPythonSpawnArgs = (scriptArgs: string[]): { command: string; args: string[] } => {
+  const exe = resolvePythonCommand();
+  if (process.platform === "win32" && /\.(cmd|bat)$/i.test(exe)) {
+    return {
+      command: process.env.ComSpec ?? "cmd.exe",
+      args: ["/d", "/s", "/c", exe, ...scriptArgs]
+    };
+  }
+  return { command: exe, args: scriptArgs };
+};
+
 const getEngineScriptPath = (): string => path.join(app.getAppPath(), "engine", "separator_core.py");
 
 const getYoutubeScriptPath = (): string => path.join(app.getAppPath(), "engine", "youtube_downloader.py");
@@ -79,20 +94,22 @@ const isPathUnderOutputRoot = (absFile: string): boolean => {
 };
 
 const registerLocalAudioProtocol = (): void => {
-  protocol.handle("audiosplit-local", (request) => {
+  protocol.registerFileProtocol("audiosplit-local", (request, callback) => {
     try {
       const u = new URL(request.url);
       const raw = u.searchParams.get("p");
       if (!raw) {
-        return new Response("Missing path parameter.", { status: 400 });
+        callback({ error: -2 });
+        return;
       }
       const abs = path.normalize(decodeURIComponent(raw));
       if (!existsSync(abs) || !isPathUnderOutputRoot(abs)) {
-        return new Response("File not found.", { status: 404 });
+        callback({ error: -6 });
+        return;
       }
-      return net.fetch(pathToFileURL(abs).toString());
+      callback({ path: abs });
     } catch {
-      return new Response("Invalid request.", { status: 400 });
+      callback({ error: -2 });
     }
   });
 };
@@ -109,12 +126,6 @@ const sendYoutubeProgress = (payload: YoutubeProgressPayload): void => {
 
 /** Mantem referencia aos downloads ativos para suportar cancelamento. */
 const activeDownloads = new Map<string, ChildProcess>();
-const DEVICE_CACHE_TTL_MS = 1000 * 60 * 5;
-const DEVICE_DETECTION_TIMEOUT_MS = 1000 * 15;
-const FALLBACK_DEVICES: SeparationDeviceInfo[] = [{ mode: "cpu", name: "CPU", label: "CPU - CPU", kind: "cpu" }];
-
-let deviceCache: { devices: SeparationDeviceInfo[]; expiresAt: number } | null = null;
-let pendingDeviceDetection: Promise<SeparationDeviceInfo[]> | null = null;
 
 const createWindow = (): void => {
   mainWindow = new BrowserWindow({
@@ -181,26 +192,22 @@ const runSeparation = async (request: StartSeparationRequest): Promise<StartSepa
   const outputDir = path.join(getOutputRoot(), `${safeName}_${jobId}`);
   await fs.mkdir(outputDir, { recursive: true });
 
-  const pythonCommand = resolvePythonCommand();
   const engineScript = getEngineScriptPath();
+  const { command, args } = buildPythonSpawnArgs([
+    "-u",
+    engineScript,
+    "--input",
+    normalized,
+    "--output-dir",
+    outputDir,
+    "--job-id",
+    jobId,
+    "--device",
+    device
+  ]);
 
   return new Promise<StartSeparationResponse>((resolve) => {
-    const child = spawn(
-      pythonCommand,
-      [
-        "-u",
-        engineScript,
-        "--input",
-        normalized,
-        "--output-dir",
-        outputDir,
-        "--job-id",
-        jobId,
-        "--device",
-        device
-      ],
-      { stdio: ["ignore", "pipe", "pipe"], env: buildChildEnv(device) }
-    );
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"], env: buildChildEnv(device) });
 
     let stderrBuffer = "";
 
@@ -261,8 +268,7 @@ const runSeparation = async (request: StartSeparationRequest): Promise<StartSepa
   });
 };
 
-const detectSeparationDevices = async (): Promise<SeparationDeviceInfo[]> => {
-  const pythonCommand = resolvePythonCommand();
+const listSeparationDevices = async (): Promise<SeparationDeviceInfo[]> => {
   const script = [
     "import json, platform",
     "devices = []",
@@ -293,17 +299,13 @@ const detectSeparationDevices = async (): Promise<SeparationDeviceInfo[]> => {
   ].join("\n");
 
   return new Promise<SeparationDeviceInfo[]>((resolve) => {
-    const child = spawn(pythonCommand, ["-c", script], { stdio: ["ignore", "pipe", "ignore"] });
+    const { command, args } = buildPythonSpawnArgs(["-c", script]);
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "ignore"] });
     let stdout = "";
-    const timeoutHandle = setTimeout(() => {
-      child.kill("SIGTERM");
-      resolve(FALLBACK_DEVICES);
-    }, DEVICE_DETECTION_TIMEOUT_MS);
     child.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk.toString("utf8");
     });
     child.on("close", () => {
-      clearTimeout(timeoutHandle);
       try {
         const parsed = JSON.parse(stdout.trim()) as {
           devices?: Array<{ mode?: string; name?: string; label?: string; kind?: string }>;
@@ -323,34 +325,12 @@ const detectSeparationDevices = async (): Promise<SeparationDeviceInfo[]> => {
       } catch {
         // ignore parse failures and fallback
       }
-      resolve(FALLBACK_DEVICES);
+      resolve([{ mode: "cpu", name: "CPU", label: "CPU - CPU", kind: "cpu" }]);
     });
     child.on("error", () => {
-      clearTimeout(timeoutHandle);
-      resolve(FALLBACK_DEVICES);
+      resolve([{ mode: "cpu", name: "CPU", label: "CPU - CPU", kind: "cpu" }]);
     });
   });
-};
-
-const listSeparationDevices = async (): Promise<SeparationDeviceInfo[]> => {
-  const now = Date.now();
-  if (deviceCache && deviceCache.expiresAt > now) {
-    return deviceCache.devices;
-  }
-  if (pendingDeviceDetection) {
-    return pendingDeviceDetection;
-  }
-
-  pendingDeviceDetection = detectSeparationDevices()
-    .then((devices) => {
-      deviceCache = { devices, expiresAt: Date.now() + DEVICE_CACHE_TTL_MS };
-      return devices;
-    })
-    .finally(() => {
-      pendingDeviceDetection = null;
-    });
-
-  return pendingDeviceDetection;
 };
 
 const runYoutubeDownload = async (
@@ -376,15 +356,22 @@ const runYoutubeDownload = async (
   }
 
   const jobId = randomUUID();
-  const pythonCommand = resolvePythonCommand();
   const youtubeScript = getYoutubeScriptPath();
+  const { command, args } = buildPythonSpawnArgs([
+    "-u",
+    youtubeScript,
+    "--url",
+    url,
+    "--output-dir",
+    outputDir,
+    "--format",
+    format,
+    "--job-id",
+    jobId
+  ]);
 
   return new Promise<StartYoutubeDownloadResponse>((resolve) => {
-    const child = spawn(
-      pythonCommand,
-      ["-u", youtubeScript, "--url", url, "--output-dir", outputDir, "--format", format, "--job-id", jobId],
-      { stdio: ["ignore", "pipe", "pipe"] }
-    );
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
     activeDownloads.set(jobId, child);
 
     let stderrBuffer = "";
@@ -472,12 +459,16 @@ const runYoutubePreview = async (url: string): Promise<YoutubePreviewResponse> =
   if (!YOUTUBE_URL_RE.test(url.trim())) {
     return { success: false, error: "URL do YouTube invalida." };
   }
-  const pythonCommand = resolvePythonCommand();
   const youtubeScript = getYoutubeScriptPath();
+  const { command, args } = buildPythonSpawnArgs([
+    "-u",
+    youtubeScript,
+    "--url",
+    url.trim(),
+    "--preview-only"
+  ]);
   return new Promise<YoutubePreviewResponse>((resolve) => {
-    const child = spawn(pythonCommand, ["-u", youtubeScript, "--url", url.trim(), "--preview-only"], {
-      stdio: ["ignore", "pipe", "pipe"]
-    });
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
     let stdoutBuffer = "";
     let stderrBuffer = "";
     let info: YoutubePreviewInfo | null = null;
@@ -537,27 +528,6 @@ const cancelYoutubeDownload = (jobId: string): boolean => {
 
 const AUDIO_EXT_RE = /\.(wav|mp3|flac|m4a|aiff|aif|ogg)$/i;
 const JOB_ID_SUFFIX_RE = /_[0-9a-f-]{8,}$/i;
-const LIBRARY_LIST_CONCURRENCY = 8;
-
-const readLibraryEntry = async (root: string, dirent: import("node:fs").Dirent): Promise<LibraryEntry | null> => {
-  const fullPath = path.join(root, dirent.name);
-  try {
-    const [childStat, files] = await Promise.all([fs.stat(fullPath), fs.readdir(fullPath)]);
-    const stemFiles = files.filter((f) => AUDIO_EXT_RE.test(f)).sort();
-    if (stemFiles.length === 0) return null;
-
-    const displayName = dirent.name.replace(JOB_ID_SUFFIX_RE, "");
-    return {
-      id: dirent.name,
-      name: displayName || dirent.name,
-      path: fullPath,
-      createdAt: childStat.mtime.toISOString(),
-      stems: stemFiles.map((f) => path.join(fullPath, f))
-    };
-  } catch {
-    return null;
-  }
-};
 
 const listLibraryEntries = async (): Promise<LibraryEntry[]> => {
   const root = getOutputRoot();
@@ -569,21 +539,28 @@ const listLibraryEntries = async (): Promise<LibraryEntry[]> => {
     return [];
   }
 
-  const directories = dirents.filter((dirent) => dirent.isDirectory());
   const entries: LibraryEntry[] = [];
-  let nextIndex = 0;
-  const workerCount = Math.min(LIBRARY_LIST_CONCURRENCY, directories.length);
-
-  await Promise.all(
-    Array.from({ length: workerCount }, async () => {
-      while (nextIndex < directories.length) {
-        const dirent = directories[nextIndex];
-        nextIndex += 1;
-        const entry = await readLibraryEntry(root, dirent);
-        if (entry) entries.push(entry);
-      }
-    })
-  );
+  for (const dirent of dirents) {
+    if (!dirent.isDirectory()) continue;
+    const fullPath = path.join(root, dirent.name);
+    try {
+      const childStat = await fs.stat(fullPath);
+      const stemFiles = (await fs.readdir(fullPath))
+        .filter((f) => AUDIO_EXT_RE.test(f))
+        .sort();
+      if (stemFiles.length === 0) continue;
+      const displayName = dirent.name.replace(JOB_ID_SUFFIX_RE, "");
+      entries.push({
+        id: dirent.name,
+        name: displayName || dirent.name,
+        path: fullPath,
+        createdAt: childStat.mtime.toISOString(),
+        stems: stemFiles.map((f) => path.join(fullPath, f))
+      });
+    } catch {
+      /* ignorar entradas ilegiveis */
+    }
+  }
 
   entries.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   return entries;
