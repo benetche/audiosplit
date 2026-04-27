@@ -1,5 +1,5 @@
-import type { ProgressPayload, SeparationDeviceMode } from "../../electron/types";
 import type { AppLanguage } from "../i18n/translations";
+import type { ProgressPayload, SeparationDeviceInfo, SeparationDeviceMode } from "../../electron/types";
 import type { MixerChannel } from "../lib/mixer/channels";
 
 export type StemItem = {
@@ -14,6 +14,9 @@ export type AppState = {
   selectedFilePath: string;
   selectedFileName: string;
   deviceMode: SeparationDeviceMode;
+  separationDevices: SeparationDeviceInfo[];
+  separationDevicesLoading: boolean;
+  separationDevicesLoaded: boolean;
   logs: string[];
   progress: number;
   processing: boolean;
@@ -30,6 +33,8 @@ export type AppState = {
   setFile: (path: string, name: string) => void;
   setStems: (stems: StemItem[], outputDir?: string) => void;
   setDeviceMode: (mode: SeparationDeviceMode) => void;
+  setSeparationDevices: (devices: SeparationDeviceInfo[]) => void;
+  setSeparationDevicesLoading: (loading: boolean) => void;
   appendLog: (entry: string) => void;
   clearLogs: () => void;
   resetJob: () => void;

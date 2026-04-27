@@ -12,12 +12,16 @@ const loadInitialLanguage = (): AppLanguage => {
   }
   return "en";
 };
+const defaultSeparationDevices = [{ mode: "cpu" as const, name: "CPU", label: "CPU - CPU", kind: "cpu" as const }];
 
 export const useAppStore = create<AppState>((set) => ({
   view: "download",
   selectedFilePath: "",
   selectedFileName: "",
   deviceMode: "auto",
+  separationDevices: defaultSeparationDevices,
+  separationDevicesLoading: false,
+  separationDevicesLoaded: false,
   logs: [],
   progress: 0,
   processing: false,
@@ -42,6 +46,8 @@ export const useAppStore = create<AppState>((set) => ({
     set({ language });
   },
   setDeviceMode: (deviceMode) => set({ deviceMode }),
+  setSeparationDevices: (separationDevices) => set({ separationDevices, separationDevicesLoaded: true }),
+  setSeparationDevicesLoading: (separationDevicesLoading) => set({ separationDevicesLoading }),
   appendLog: (entry) => set((state) => ({ logs: [...state.logs, entry] })),
   clearLogs: () => set({ logs: [] }),
   resetJob: () =>
