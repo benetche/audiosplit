@@ -567,9 +567,10 @@ const readWavDuration = async (sourcePath: string): Promise<number> => {
       const chunkDataPosition = position + 8;
 
       if (chunkId === "fmt ") {
-        const fmt = Buffer.alloc(Math.min(chunkSize, 16));
-        await handle.read(fmt, 0, fmt.length, chunkDataPosition);
-        if (fmt.length >= 12) {
+        const fmtLen = Math.min(chunkSize, 32);
+        const fmt = Buffer.alloc(fmtLen);
+        const { bytesRead: fmtBytesRead } = await handle.read(fmt, 0, fmt.length, chunkDataPosition);
+        if (fmtBytesRead >= 12) {
           byteRate = fmt.readUInt32LE(8);
         }
       } else if (chunkId === "data") {
@@ -633,12 +634,14 @@ const listLibraryEntries = async (): Promise<LibraryEntry[]> => {
   const directories = dirents.filter((dirent) => dirent.isDirectory());
   const entries: LibraryEntry[] = [];
   const workerCount = Math.min(LIBRARY_LIST_CONCURRENCY, directories.length);
+  let nextDirectoryIndex = 0;
 
   await Promise.all(
     Array.from({ length: workerCount }, async () => {
       while (true) {
-        const dirent = directories.pop();
-        if (!dirent) break;
+        const index = nextDirectoryIndex++;
+        if (index >= directories.length) break;
+        const dirent = directories[index];
         const entry = await readLibraryEntry(root, dirent);
         if (entry) entries.push(entry);
       }
