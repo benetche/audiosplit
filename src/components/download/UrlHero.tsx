@@ -1,4 +1,5 @@
 import { Link2, X } from "lucide-react";
+import { useI18n } from "../../i18n/I18nProvider";
 import { useYoutubePreview } from "../../hooks/useYoutubePreview";
 import { ThumbnailCard } from "./ThumbnailCard";
 
@@ -9,6 +10,7 @@ type UrlHeroProps = {
 };
 
 export function UrlHero({ value, onChange, disabled = false }: UrlHeroProps) {
+  const { t } = useI18n();
   const preview = useYoutubePreview(value);
   const hasValue = value.length > 0;
 
@@ -25,7 +27,7 @@ export function UrlHero({ value, onChange, disabled = false }: UrlHeroProps) {
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Cole um link do YouTube aqui..."
+          placeholder={t("download.urlPlaceholder")}
           className="flex-1 bg-transparent text-sm text-text-primary placeholder-text-muted outline-none disabled:opacity-50"
         />
         {hasValue ? (
@@ -33,7 +35,7 @@ export function UrlHero({ value, onChange, disabled = false }: UrlHeroProps) {
             type="button"
             onClick={() => onChange("")}
             disabled={disabled}
-            aria-label="Limpar"
+            aria-label={t("download.clear")}
             className="flex h-6 w-6 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-white/10 hover:text-text-primary disabled:opacity-50"
           >
             <X className="h-3.5 w-3.5" strokeWidth={1.75} />

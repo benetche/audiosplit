@@ -1,3 +1,4 @@
+import type { AppLanguage } from "../i18n/translations";
 import type { ProgressPayload, SeparationDeviceInfo, SeparationDeviceMode } from "../../electron/types";
 import type { MixerChannel } from "../lib/mixer/channels";
 
@@ -27,6 +28,7 @@ export type AppState = {
   soloChannels: Record<MixerChannel, boolean>;
   /** Ultima pasta escolhida para downloads nesta sessao (nao persistida em disco). */
   lastDownloadDir: string;
+  language: AppLanguage;
   setView: (view: AppView) => void;
   setFile: (path: string, name: string) => void;
   setStems: (stems: StemItem[], outputDir?: string) => void;
@@ -41,4 +43,5 @@ export type AppState = {
   toggleChannelMute: (channel: MixerChannel) => void;
   toggleChannelSolo: (channel: MixerChannel) => void;
   setLastDownloadDir: (dir: string) => void;
+  setLanguage: (language: AppLanguage) => void;
 };

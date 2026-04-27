@@ -1,12 +1,14 @@
 import { Check, CheckCircle2, FolderOpen, Settings as SettingsIcon, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { EnvInfo } from "../../../electron/types";
+import { useI18n } from "../../i18n/I18nProvider";
 import { useAppStore } from "../../store/useAppStore";
 import { DeviceSelector } from "../separation/DeviceSelector";
 import { Skeleton } from "../ui/Skeleton";
 
 export function SettingsView() {
   const [env, setEnv] = useState<EnvInfo | null>(null);
+  const { language, setLanguage, t } = useI18n();
   const lastDownloadDir = useAppStore((s) => s.lastDownloadDir);
   const setLastDownloadDir = useAppStore((s) => s.setLastDownloadDir);
 
@@ -32,26 +34,26 @@ export function SettingsView() {
       <header>
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
           <SettingsIcon className="h-6 w-6 text-accent" strokeWidth={1.75} />
-          Configurações
+          {t("settings.title")}
         </h1>
         <p className="mt-1 text-sm text-text-secondary">
-          Escolha o dispositivo de inferencia e ajuste os diretorios padroes.
+          {t("settings.subtitle")}
         </p>
       </header>
 
-      <Section title="Performance">
+      <Section title={t("settings.section.performance")}>
         <DeviceSelector />
       </Section>
 
-      <Section title="Downloads">
+      <Section title={t("settings.section.downloads")}>
         <label className="flex flex-col gap-1.5 text-xs text-text-secondary">
-          <span>Pasta padrao</span>
+          <span>{t("settings.defaultFolder")}</span>
           <div className="flex gap-2">
             <input
               type="text"
               readOnly
               value={activeDownloadDir}
-              placeholder="Sem pasta escolhida"
+              placeholder={t("settings.noFolder")}
               className="flex-1 truncate rounded-xl2 border border-white/5 bg-background px-3 py-2 text-sm text-text-primary"
             />
             <button
@@ -60,13 +62,27 @@ export function SettingsView() {
               className="flex items-center gap-1.5 rounded-xl2 border border-white/5 bg-background px-3 py-2 text-sm text-text-secondary transition-colors hover:border-white/10 hover:text-text-primary"
             >
               <FolderOpen className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Escolher
+              {t("download.choose")}
             </button>
           </div>
         </label>
       </Section>
 
-      <Section title="Ambiente">
+      <Section title={t("settings.section.language")}>
+        <label className="flex flex-col gap-1.5 text-xs text-text-secondary">
+          <span>{t("settings.language.label")}</span>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value as "en" | "pt-BR")}
+            className="max-w-[280px] rounded-xl2 border border-white/5 bg-background px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-accent/40"
+          >
+            <option value="en">{t("settings.language.english")}</option>
+            <option value="pt-BR">{t("settings.language.portuguese")}</option>
+          </select>
+        </label>
+      </Section>
+
+      <Section title={t("settings.section.environment")}>
         {env === null ? (
           <div className="flex flex-col gap-2">
             <Skeleton className="h-4 w-2/3" />
@@ -76,7 +92,7 @@ export function SettingsView() {
         ) : (
           <dl className="grid grid-cols-1 gap-y-2 text-xs sm:grid-cols-[140px_1fr]">
             <InfoRow label="App" value={`v${env.appVersion}`} />
-            <InfoRow label="Plataforma" value={env.platform} />
+            <InfoRow label={t("settings.platform")} value={env.platform} />
             <InfoRow label="Python" value={env.pythonPath} />
             <InfoRow
               label="FFmpeg"
@@ -84,12 +100,12 @@ export function SettingsView() {
                 env.ffmpegFound ? (
                   <span className="flex items-center gap-1 text-emerald-300">
                     <CheckCircle2 className="h-3 w-3" strokeWidth={2} />
-                    {env.ffmpegVersion || "detectado"}
+                    {env.ffmpegVersion || t("settings.detected")}
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 text-red-300">
                     <XCircle className="h-3 w-3" strokeWidth={2} />
-                    nao encontrado no PATH
+                    {t("settings.ffmpegMissing")}
                   </span>
                 )
               }

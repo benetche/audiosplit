@@ -1,4 +1,5 @@
 import { Pause, Play } from "lucide-react";
+import { useI18n } from "../../i18n/I18nProvider";
 import { formatTime } from "../../lib/audio/formatTime";
 
 type MixerTransportProps = {
@@ -11,6 +12,7 @@ type MixerTransportProps = {
 };
 
 export function MixerTransport({ playing, ready, duration, displayTime, onPlayPause, onSeek }: MixerTransportProps) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-4">
@@ -18,7 +20,7 @@ export function MixerTransport({ playing, ready, duration, displayTime, onPlayPa
           type="button"
           onClick={onPlayPause}
           disabled={!ready}
-          aria-label={playing ? "Pausar" : "Tocar"}
+          aria-label={playing ? t("mixer.pause") : t("mixer.play")}
           className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-white transition-all duration-200 hover:scale-[1.06] hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
         >
           {playing ? <Pause className="h-5 w-5" strokeWidth={2} /> : <Play className="ml-0.5 h-5 w-5" strokeWidth={2} />}

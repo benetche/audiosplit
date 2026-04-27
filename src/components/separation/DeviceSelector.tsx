@@ -1,8 +1,10 @@
 import type { SeparationDeviceMode } from "../../../electron/types";
+import { useI18n } from "../../i18n/I18nProvider";
 import { useEffect, useMemo } from "react";
 import { useAppStore } from "../../store/useAppStore";
 
 export function DeviceSelector() {
+  const { t } = useI18n();
   const deviceMode = useAppStore((s) => s.deviceMode);
   const setDeviceMode = useAppStore((s) => s.setDeviceMode);
   const processing = useAppStore((s) => s.processing);
@@ -40,7 +42,7 @@ export function DeviceSelector() {
 
   return (
     <label className="flex flex-col gap-1.5 text-xs text-text-secondary">
-      <span>Dispositivo</span>
+      <span>{t("separation.device")}</span>
       <select
         value={hasCurrentMode ? deviceMode : (devices[0]?.mode ?? "cpu")}
         onChange={(e) => setDeviceMode(e.target.value as SeparationDeviceMode)}

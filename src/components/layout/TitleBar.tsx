@@ -1,8 +1,10 @@
 import { Copy, Minus, Square, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useI18n } from "../../i18n/I18nProvider";
 
 export function TitleBar() {
   const [maximized, setMaximized] = useState(false);
+  const { t } = useI18n();
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -22,13 +24,13 @@ export function TitleBar() {
 
       <div className="no-drag flex items-center gap-0.5">
         <WindowButton
-          label="Minimizar"
+          label={t("window.minimize")}
           onClick={() => void window.audioSplit.windowControls.minimize()}
         >
           <Minus className="h-3.5 w-3.5" strokeWidth={1.75} />
         </WindowButton>
         <WindowButton
-          label={maximized ? "Restaurar" : "Maximizar"}
+          label={maximized ? t("window.restore") : t("window.maximize")}
           onClick={() => void window.audioSplit.windowControls.toggleMaximize()}
         >
           {maximized ? (
@@ -38,7 +40,7 @@ export function TitleBar() {
           )}
         </WindowButton>
         <WindowButton
-          label="Fechar"
+          label={t("window.close")}
           onClick={() => void window.audioSplit.windowControls.close()}
           variant="close"
         >

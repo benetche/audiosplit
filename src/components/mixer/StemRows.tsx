@@ -1,10 +1,11 @@
 import { Download, Drum, Guitar, Mic2, Music, Piano, type LucideIcon } from "lucide-react";
+import { useI18n } from "../../i18n/I18nProvider";
+import type { TranslationKey } from "../../i18n/translations";
 import {
   channelHasStems,
   effectiveMute,
   inferMixerChannel,
   MIXER_CHANNEL_ORDER,
-  MIXER_LABELS,
   type MixerChannel
 } from "../../lib/mixer/channels";
 import type { StemItem } from "../../store/types";
@@ -27,6 +28,7 @@ type StemRowsProps = {
 };
 
 export function StemRows({ stems, duration, displayTime, onSeek }: StemRowsProps) {
+  const { t } = useI18n();
   const muted = useAppStore((s) => s.mutedChannels);
   const solo = useAppStore((s) => s.soloChannels);
   const toggleMute = useAppStore((s) => s.toggleChannelMute);
@@ -40,6 +42,7 @@ export function StemRows({ stems, duration, displayTime, onSeek }: StemRowsProps
         const has = channelHasStems(stems, channel);
         const Icon = CHANNEL_ICONS[channel];
         const stem = stems.find((s) => inferChannel(s.name) === channel);
+        const channelLabel = getChannelLabel(channel, t);
         const muteActive = muted[channel];
         const soloActive = solo[channel];
         const effMuted = effectiveMute(channel, muted, solo);
@@ -64,9 +67,9 @@ export function StemRows({ stems, duration, displayTime, onSeek }: StemRowsProps
                 <Icon className="h-4 w-4" strokeWidth={1.75} />
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-medium text-text-primary">{MIXER_LABELS[channel]}</span>
+                <span className="text-sm font-medium text-text-primary">{channelLabel}</span>
                 <span className="mono text-[10px] text-text-muted">
-                  {has ? (stem ? truncate(stem.name, 22) : "1 stem") : "sem stem"}
+                  {has ? (stem ? truncate(stem.name, 22) : t("mixer.oneStem")) : t("mixer.noStem")}
                 </span>
               </div>
             </div>
@@ -87,7 +90,7 @@ export function StemRows({ stems, duration, displayTime, onSeek }: StemRowsProps
             <div className="flex items-center gap-1.5">
               <TogglePill
                 label="S"
-                title="Solo"
+                title={t("mixer.solo")}
                 active={soloActive}
                 disabled={!has}
                 onClick={() => toggleSolo(channel)}
@@ -95,7 +98,7 @@ export function StemRows({ stems, duration, displayTime, onSeek }: StemRowsProps
               />
               <TogglePill
                 label="M"
-                title="Mute"
+                title={t("mixer.mute")}
                 active={muteActive}
                 disabled={!has}
                 onClick={() => toggleMute(channel)}
@@ -103,8 +106,8 @@ export function StemRows({ stems, duration, displayTime, onSeek }: StemRowsProps
               />
               <button
                 type="button"
-                aria-label={`Exportar ${MIXER_LABELS[channel]}`}
-                title="Exportar stem"
+                aria-label={t("mixer.exportChannelAria", { channel: channelLabel })}
+                title={t("mixer.exportStemTitle")}
                 disabled={!has || !stem}
                 onClick={() => stem && void window.audioSplit.exportStem(stem.path)}
                 className="flex h-8 w-8 items-center justify-center rounded-xl2 border border-white/5 text-text-secondary transition-all duration-200 hover:border-white/10 hover:bg-white/5 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
@@ -155,4 +158,22 @@ function truncate(value: string, max: number): string {
 
 function inferChannel(name: string): MixerChannel {
   return inferMixerChannel(name);
+}
+
+function getChannelLabel(
+  channel: MixerChannel,
+  t: (key: TranslationKey) => string
+): string {
+  switch (channel) {
+    case "vocals":
+      return t("mixer.channelVocals");
+    case "drums":
+      return t("mixer.channelDrums");
+    case "bass":
+      return t("mixer.channelBass");
+    case "guitars":
+      return t("mixer.channelGuitars");
+    default:
+      return t("mixer.channelOther");
+  }
 }

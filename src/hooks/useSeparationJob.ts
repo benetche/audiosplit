@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { useI18n } from "../i18n/I18nProvider";
 import { useAppStore } from "../store/useAppStore";
 
 type SeparationJobApi = {
@@ -8,6 +9,7 @@ type SeparationJobApi = {
 
 /** Controla o ciclo de vida do job de separação (iniciar + feedback no store). */
 export function useSeparationJob(): SeparationJobApi {
+  const { t } = useI18n();
   const selectedFilePath = useAppStore((s) => s.selectedFilePath);
   const processing = useAppStore((s) => s.processing);
   const deviceMode = useAppStore((s) => s.deviceMode);
@@ -24,18 +26,18 @@ export function useSeparationJob(): SeparationJobApi {
     if (!selectedFilePath || processing) return;
     resetJob();
     setProcessing(true);
-    appendLog("Iniciando separacao...");
+    appendLog(t("hooks.separation.starting"));
     const response = await window.audioSplit.startSeparation({
       inputPath: selectedFilePath,
       device: deviceMode
     });
     if (!response.success) {
-      appendLog(response.error ?? "Falha desconhecida.");
+      appendLog(response.error ?? t("hooks.separation.unknownFailure"));
     } else {
-      appendLog("Concluido.");
+      appendLog(t("hooks.separation.done"));
     }
     setProcessing(false);
-  }, [selectedFilePath, processing, deviceMode, resetJob, setProcessing, appendLog]);
+  }, [selectedFilePath, processing, deviceMode, resetJob, setProcessing, appendLog, t]);
 
   return { canProcess, start };
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DownloadAudioFormat, YoutubeProgressPayload } from "../../electron/types";
+import { useI18n } from "../i18n/I18nProvider";
 import { useAppStore } from "../store/useAppStore";
 
 export type DownloadStatus = "idle" | "downloading" | "converting" | "done" | "error";
@@ -37,13 +38,21 @@ const INITIAL_STATE: YoutubeDownloadState = {
 };
 
 const baseName = (p: string): string => p.split(/[\\/]/).pop() ?? p;
+const MIN_PROGRESS_UPDATE_MS = 250;
+const MIN_PROGRESS_DELTA = 1;
 
 export function useYoutubeDownload(): YoutubeDownloadApi {
+  const { t } = useI18n();
   const appendLog = useAppStore((s) => s.appendLog);
   const setFile = useAppStore((s) => s.setFile);
   const [state, setState] = useState<YoutubeDownloadState>(INITIAL_STATE);
   const autoImportRef = useRef(false);
   const jobIdRef = useRef<string | null>(null);
+  const progressRef = useRef<{ status: DownloadStatus; percent: number; updatedAt: number }>({
+    status: "idle",
+    percent: 0,
+    updatedAt: 0
+  });
 
   useEffect(() => {
     const unsubscribe = window.audioSplit.onYoutubeProgress((payload: YoutubeProgressPayload) => {
@@ -57,6 +66,17 @@ export function useYoutubeDownload(): YoutubeDownloadApi {
           typeof payload.progress === "number" && Number.isFinite(payload.progress)
             ? Math.max(0, Math.min(100, payload.progress))
             : undefined;
+        const last = progressRef.current;
+        const nextPercent = percent ?? last.percent;
+        const now = Date.now();
+        const shouldUpdate =
+          phase !== last.status ||
+          Math.abs(nextPercent - last.percent) >= MIN_PROGRESS_DELTA ||
+          now - last.updatedAt >= MIN_PROGRESS_UPDATE_MS ||
+          nextPercent >= 100;
+        if (!shouldUpdate) return;
+
+        progressRef.current = { status: phase, percent: nextPercent, updatedAt: now };
         setState((prev) => ({
           ...prev,
           status: phase,
@@ -72,6 +92,7 @@ export function useYoutubeDownload(): YoutubeDownloadApi {
 
       if (payload.type === "error") {
         appendLog(`[youtube] ${payload.message}`);
+        progressRef.current = { status: "error", percent: progressRef.current.percent, updatedAt: Date.now() };
         setState((prev) => ({
           ...prev,
           status: "error",
@@ -83,6 +104,7 @@ export function useYoutubeDownload(): YoutubeDownloadApi {
       if (payload.type === "complete" && typeof payload.filePath === "string") {
         const filePath = payload.filePath;
         const title = payload.title ?? baseName(filePath);
+        progressRef.current = { status: "done", percent: 100, updatedAt: Date.now() };
         setState({
           status: "done",
           percent: 100,
@@ -91,19 +113,20 @@ export function useYoutubeDownload(): YoutubeDownloadApi {
           title,
           error: null
         });
-        appendLog(`[youtube] Download concluido: ${title}`);
+        appendLog(t("hooks.youtube.downloadDone", { title }));
         if (autoImportRef.current) {
           setFile(filePath, baseName(filePath));
-          appendLog(`[youtube] Importado automaticamente para separacao.`);
+          appendLog(t("hooks.youtube.autoImported"));
         }
       }
     });
     return unsubscribe;
-  }, [appendLog, setFile]);
+  }, [appendLog, setFile, t]);
 
   const start = useCallback(
     async ({ url, format, outputDir, autoImport }: StartParams) => {
       autoImportRef.current = autoImport;
+      progressRef.current = { status: "downloading", percent: 0, updatedAt: 0 };
       setState({
         status: "downloading",
         percent: 0,
@@ -112,11 +135,11 @@ export function useYoutubeDownload(): YoutubeDownloadApi {
         title: null,
         error: null
       });
-      appendLog(`[youtube] Iniciando download (${format})...`);
+      appendLog(t("hooks.youtube.startingDownload", { format }));
 
       const response = await window.audioSplit.startYoutubeDownload({ url, format, outputDir });
       if (!response.success) {
-        const error = response.error ?? "Falha desconhecida no download.";
+        const error = response.error ?? t("hooks.youtube.unknownFailure");
         jobIdRef.current = null;
         setState((prev) => ({
           ...prev,
@@ -132,6 +155,7 @@ export function useYoutubeDownload(): YoutubeDownloadApi {
       // O evento "complete" via onYoutubeProgress ja cuidou do auto-import;
       // aqui apenas confirmamos o estado final caso o evento tenha sido perdido.
       if (response.filePath) {
+        progressRef.current = { status: "done", percent: 100, updatedAt: Date.now() };
         setState((prev) => ({
           ...prev,
           status: "done",
@@ -142,20 +166,23 @@ export function useYoutubeDownload(): YoutubeDownloadApi {
         }));
       }
     },
-    [appendLog]
+    [appendLog, t]
   );
 
   const cancel = useCallback(async () => {
     const jobId = jobIdRef.current;
     if (!jobId) return;
     await window.audioSplit.cancelYoutubeDownload(jobId);
-    setState((prev) => ({ ...prev, status: "error", error: "Download cancelado." }));
-    appendLog("[youtube] Download cancelado.");
-  }, [appendLog]);
+    const cancelledMessage = t("hooks.youtube.cancelled");
+    progressRef.current = { status: "error", percent: progressRef.current.percent, updatedAt: Date.now() };
+    setState((prev) => ({ ...prev, status: "error", error: cancelledMessage }));
+    appendLog(t("hooks.youtube.cancelledLog"));
+  }, [appendLog, t]);
 
   const reset = useCallback(() => {
     jobIdRef.current = null;
     autoImportRef.current = false;
+    progressRef.current = { status: "idle", percent: 0, updatedAt: 0 };
     setState(INITIAL_STATE);
   }, []);
 
