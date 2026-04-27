@@ -571,14 +571,13 @@ const listLibraryEntries = async (): Promise<LibraryEntry[]> => {
 
   const directories = dirents.filter((dirent) => dirent.isDirectory());
   const entries: LibraryEntry[] = [];
-  let nextIndex = 0;
   const workerCount = Math.min(LIBRARY_LIST_CONCURRENCY, directories.length);
 
   await Promise.all(
     Array.from({ length: workerCount }, async () => {
-      while (nextIndex < directories.length) {
-        const dirent = directories[nextIndex];
-        nextIndex += 1;
+      while (true) {
+        const dirent = directories.pop();
+        if (!dirent) break;
         const entry = await readLibraryEntry(root, dirent);
         if (entry) entries.push(entry);
       }
