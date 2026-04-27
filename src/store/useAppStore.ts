@@ -116,14 +116,22 @@ function localizeProgressMessage(language: AppLanguage, message: string): string
     case "Processing timed out and was terminated.":
       return language === "pt-BR" ? "Processamento excedeu o tempo limite e foi encerrado." : message;
     case "Separation finished.":
-      return language === "pt-BR" ? "Separacao concluida." : "Separation completed.";
+      return language === "pt-BR" ? "Separação concluída." : "Separation completed.";
     default:
       return normalizeKnownBackendPortuguese(language, message);
   }
 }
 
 function normalizeKnownBackendPortuguese(language: AppLanguage, message: string): string {
-  if (language === "pt-BR") return message;
+  if (language === "pt-BR") {
+    if (message.includes("URL do YouTube invalida")) return "URL do YouTube inválida.";
+    if (message.includes("Formato de audio nao suportado")) return "Formato de áudio não suportado.";
+    if (message.includes("Download excedeu o tempo limite")) return "Download excedeu o tempo limite e foi encerrado.";
+    if (message.includes("Caminho fora do diretorio de saida")) return "Caminho fora do diretório de saída.";
+    if (message.includes("Janela nao disponivel")) return "Janela não disponível.";
+    if (message.includes("Arquivo de origem nao encontrado")) return "Arquivo de origem não encontrado.";
+    return message;
+  }
   if (message.includes("URL do YouTube invalida")) return "Invalid YouTube URL.";
   if (message.includes("Formato de audio nao suportado")) return "Unsupported audio format.";
   if (message.includes("Download excedeu o tempo limite")) return "Download timed out and was terminated.";
