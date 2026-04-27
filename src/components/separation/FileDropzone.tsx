@@ -1,8 +1,10 @@
 import { FileAudio2, UploadCloud } from "lucide-react";
+import { useI18n } from "../../i18n/I18nProvider";
 import { useFileSelection } from "../../hooks/useFileSelection";
 import { useAppStore } from "../../store/useAppStore";
 
 export function FileDropzone() {
+  const { t } = useI18n();
   const { getRootProps, getInputProps, isDragActive } = useFileSelection();
   const selectedFileName = useAppStore((s) => s.selectedFileName);
 
@@ -28,7 +30,7 @@ export function FileDropzone() {
         )}
       </div>
       <span className="text-sm text-text-secondary">
-        {isDragActive ? "Solte o arquivo aqui" : "Arraste ou clique para escolher um arquivo local"}
+        {isDragActive ? t("separation.dropNow") : t("separation.dragOrClick")}
       </span>
       {selectedFileName ? (
         <span className="max-w-full truncate text-center text-xs text-accent">{selectedFileName}</span>

@@ -1,6 +1,8 @@
 import { useAppStore } from "../../store/useAppStore";
+import { useI18n } from "../../i18n/I18nProvider";
 
 export function SeparationProgress() {
+  const { t } = useI18n();
   const progress = useAppStore((s) => s.progress);
   const processing = useAppStore((s) => s.processing);
 
@@ -12,7 +14,7 @@ export function SeparationProgress() {
   return (
     <section className="flex flex-col gap-2 rounded-xl2 border border-white/5 bg-card/60 px-5 py-4">
       <div className="flex items-center justify-between text-xs text-text-secondary">
-        <span>{processing ? "Separando stems..." : "Separacao concluida"}</span>
+        <span>{processing ? t("separation.progress.running") : t("separation.progress.done")}</span>
         <span className="mono">{Math.round(progress)}%</span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-white/5">

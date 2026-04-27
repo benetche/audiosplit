@@ -1,20 +1,22 @@
 import { Library, type LucideIcon, Settings, SlidersHorizontal } from "lucide-react";
+import { useI18n } from "../../i18n/I18nProvider";
 import { useAppStore } from "../../store/useAppStore";
 import type { AppView } from "../../store/useAppStore";
 
 type NavItem = {
   id: AppView;
-  label: string;
+  labelKey: "nav.mixer" | "nav.library" | "nav.settings";
   icon: LucideIcon;
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "download", label: "Mixer", icon: SlidersHorizontal },
-  { id: "library", label: "Biblioteca", icon: Library },
-  { id: "settings", label: "Config", icon: Settings }
+  { id: "download", labelKey: "nav.mixer", icon: SlidersHorizontal },
+  { id: "library", labelKey: "nav.library", icon: Library },
+  { id: "settings", labelKey: "nav.settings", icon: Settings }
 ];
 
 export function Sidebar() {
+  const { t } = useI18n();
   const view = useAppStore((s) => s.view);
   const setView = useAppStore((s) => s.setView);
 
@@ -28,7 +30,7 @@ export function Sidebar() {
           <NavButton
             key={item.id}
             icon={item.icon}
-            label={item.label}
+            label={t(item.labelKey)}
             active={view === item.id}
             onClick={() => setView(item.id)}
           />

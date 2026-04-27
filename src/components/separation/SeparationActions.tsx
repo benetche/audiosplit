@@ -1,8 +1,10 @@
 import { FolderOpen, Loader2, Waves } from "lucide-react";
+import { useI18n } from "../../i18n/I18nProvider";
 import { useSeparationJob } from "../../hooks/useSeparationJob";
 import { useAppStore } from "../../store/useAppStore";
 
 export function SeparationActions() {
+  const { t } = useI18n();
   const { canProcess, start } = useSeparationJob();
   const processing = useAppStore((s) => s.processing);
   const outputDir = useAppStore((s) => s.outputDir);
@@ -20,7 +22,7 @@ export function SeparationActions() {
         ) : (
           <Waves className="h-4 w-4" strokeWidth={2} />
         )}
-        {processing ? "Processando..." : "Separar"}
+        {processing ? t("separation.processing") : t("separation.start")}
       </button>
       <button
         type="button"
@@ -29,7 +31,7 @@ export function SeparationActions() {
         className="flex items-center gap-1.5 rounded-xl2 border border-white/5 px-4 py-2.5 text-sm text-text-secondary transition-all duration-200 hover:border-white/10 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
       >
         <FolderOpen className="h-3.5 w-3.5" strokeWidth={1.75} />
-        Pasta
+        {t("separation.folder")}
       </button>
     </div>
   );

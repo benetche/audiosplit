@@ -1,6 +1,7 @@
 import { Download, FolderOpen, Loader2, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { DownloadAudioFormat } from "../../../electron/types";
+import { useI18n } from "../../i18n/I18nProvider";
 import { isValidYoutubeUrl } from "../../hooks/useYoutubePreview";
 import { useYoutubeDownload } from "../../hooks/useYoutubeDownload";
 import { useAppStore } from "../../store/useAppStore";
@@ -14,6 +15,7 @@ const FORMATS: { value: DownloadAudioFormat; label: string }[] = [
 ];
 
 export function YouTubeDownloadPanel() {
+  const { t } = useI18n();
   const { state, start, cancel, reset } = useYoutubeDownload();
   const lastDownloadDir = useAppStore((s) => s.lastDownloadDir);
   const setLastDownloadDir = useAppStore((s) => s.setLastDownloadDir);
@@ -54,7 +56,7 @@ export function YouTubeDownloadPanel() {
 
   const handleStart = async () => {
     if (!urlIsValid) {
-      appendLog("[youtube] URL invalida.");
+      appendLog(t("download.invalidUrlLog"));
       return;
     }
     setLastDownloadDir(outputDir);
@@ -64,13 +66,13 @@ export function YouTubeDownloadPanel() {
   const statusLabel = (() => {
     switch (state.status) {
       case "downloading":
-        return "Baixando do YouTube...";
+        return t("download.status.downloading");
       case "converting":
-        return "Convertendo audio...";
+        return t("download.status.converting");
       case "done":
-        return "Download concluido";
+        return t("download.status.done");
       case "error":
-        return "Erro no download";
+        return t("download.status.error");
       default:
         return "";
     }
@@ -87,7 +89,7 @@ export function YouTubeDownloadPanel() {
         <div className="flex flex-col gap-4 animate-fade-in">
           <div className="flex flex-col gap-4 sm:flex-row">
             <label className="flex flex-col gap-1.5 text-xs text-text-secondary">
-              <span>Formato</span>
+              <span>{t("download.format")}</span>
               <select
                 value={format}
                 onChange={(e) => setFormat(e.target.value as DownloadAudioFormat)}
@@ -103,13 +105,13 @@ export function YouTubeDownloadPanel() {
             </label>
 
             <label className="flex flex-1 flex-col gap-1.5 text-xs text-text-secondary">
-              <span>Pasta de destino</span>
+              <span>{t("download.outputFolder")}</span>
               <div className="flex gap-2">
                 <input
                   type="text"
                   readOnly
                   value={outputDir}
-                  placeholder="Selecione uma pasta..."
+                  placeholder={t("download.selectFolder")}
                   className="flex-1 truncate rounded-xl2 border border-white/5 bg-background px-3 py-2 text-sm text-text-primary"
                 />
                 <button
@@ -119,7 +121,7 @@ export function YouTubeDownloadPanel() {
                   className="flex items-center gap-1.5 rounded-xl2 border border-white/5 bg-background px-3 py-2 text-sm text-text-secondary transition-all duration-200 hover:border-white/10 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <FolderOpen className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  Escolher
+                  {t("download.choose")}
                 </button>
               </div>
             </label>
@@ -133,7 +135,7 @@ export function YouTubeDownloadPanel() {
               disabled={isBusy}
               className="h-4 w-4 rounded border-white/10 bg-background accent-accent"
             />
-            <span>Importar automaticamente para a separacao de stems</span>
+            <span>{t("download.autoImport")}</span>
           </label>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -148,7 +150,7 @@ export function YouTubeDownloadPanel() {
               ) : (
                 <Download className="h-4 w-4" strokeWidth={2} />
               )}
-              {isBusy ? "Processando..." : "Baixar"}
+              {isBusy ? t("download.processing") : t("download.download")}
             </button>
             <button
               type="button"
@@ -157,7 +159,7 @@ export function YouTubeDownloadPanel() {
               className="flex items-center gap-1.5 rounded-xl2 border border-white/5 px-4 py-2.5 text-sm text-text-secondary transition-all duration-200 hover:border-white/10 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
             >
               <XCircle className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Cancelar
+              {t("download.cancel")}
             </button>
             {state.status !== "idle" ? (
               <button
@@ -166,7 +168,7 @@ export function YouTubeDownloadPanel() {
                 disabled={isBusy}
                 className="rounded-xl2 border border-white/5 px-3 py-2.5 text-xs text-text-muted transition-colors hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Limpar
+                {t("download.reset")}
               </button>
             ) : null}
           </div>
@@ -188,7 +190,9 @@ export function YouTubeDownloadPanel() {
                 />
               </div>
               {state.status === "done" && state.title ? (
-                <p className="truncate text-xs text-text-secondary">Arquivo: {state.title}</p>
+                <p className="truncate text-xs text-text-secondary">
+                  {t("download.fileLabel", { title: state.title })}
+                </p>
               ) : null}
               {state.status === "error" && state.error ? (
                 <p className="text-xs text-red-400">{state.error}</p>

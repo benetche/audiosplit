@@ -1,10 +1,12 @@
 import { Music2 } from "lucide-react";
+import { useI18n } from "../../i18n/I18nProvider";
 import { useStemPlayback } from "../../hooks/useStemPlayback";
 import { useAppStore } from "../../store/useAppStore";
 import { MixerTransport } from "./MixerTransport";
 import { StemRows } from "./StemRows";
 
 export function MixerSection() {
+  const { t } = useI18n();
   const stems = useAppStore((s) => s.stems);
 
   if (stems.length === 0) {
@@ -14,7 +16,7 @@ export function MixerSection() {
           <Music2 className="h-5 w-5" strokeWidth={1.5} />
         </div>
         <p className="max-w-sm text-sm text-text-secondary">
-          Seus stems aparecerao aqui. Importe uma musica acima para comecar a mixar.
+          {t("mixer.empty")}
         </p>
       </section>
     );
@@ -24,13 +26,14 @@ export function MixerSection() {
 }
 
 function MixerBody() {
+  const { t } = useI18n();
   const stems = useAppStore((s) => s.stems);
   const playback = useStemPlayback(stems);
 
   return (
     <section className="flex flex-col gap-5 rounded-xl2 border border-white/5 bg-card p-5 shadow-card">
       <header className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-text-primary">Mixer</h2>
+        <h2 className="text-sm font-semibold text-text-primary">{t("mixer.header")}</h2>
         <span className="mono text-[11px] uppercase tracking-wider text-text-muted">
           {stems.length} stems
         </span>
