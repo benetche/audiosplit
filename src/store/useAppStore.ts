@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { AppLanguage } from "../i18n/translations";
-import { initialMutedChannels, initialSoloChannels } from "../lib/mixer/channels";
+import { initialChannelVolumes, initialMutedChannels, initialSoloChannels } from "../lib/mixer/channels";
 import type { AppState } from "./types";
 
 const APP_LANGUAGE_KEY = "audiosplit.language";
@@ -24,6 +24,11 @@ const appendLogEntry = (logs: string[], entry: string): string[] => {
   return next.length > MAX_LOG_ENTRIES ? next.slice(-MAX_LOG_ENTRIES) : next;
 };
 
+const clampVolume = (volume: number): number => {
+  if (!Number.isFinite(volume)) return 1;
+  return Math.max(0, Math.min(1, volume));
+};
+
 export const useAppStore = create<AppState>((set) => ({
   view: "download",
   selectedFilePath: "",
@@ -39,6 +44,8 @@ export const useAppStore = create<AppState>((set) => ({
   stems: [],
   mutedChannels: initialMutedChannels(),
   soloChannels: initialSoloChannels(),
+  channelVolumes: initialChannelVolumes(),
+  masterVolume: 1,
   lastDownloadDir: "",
   language: loadInitialLanguage(),
   setView: (view) => set({ view }),
@@ -48,7 +55,9 @@ export const useAppStore = create<AppState>((set) => ({
       stems,
       outputDir: outputDir ?? "",
       mutedChannels: initialMutedChannels(),
-      soloChannels: initialSoloChannels()
+      soloChannels: initialSoloChannels(),
+      channelVolumes: initialChannelVolumes(),
+      masterVolume: 1
     }),
   setLastDownloadDir: (lastDownloadDir) => set({ lastDownloadDir }),
   setLanguage: (language) => {
@@ -71,7 +80,9 @@ export const useAppStore = create<AppState>((set) => ({
       outputDir: "",
       stems: [],
       mutedChannels: initialMutedChannels(),
-      soloChannels: initialSoloChannels()
+      soloChannels: initialSoloChannels(),
+      channelVolumes: initialChannelVolumes(),
+      masterVolume: 1
     }),
   setProcessing: (processing) => set({ processing }),
   applyProgress: (payload) =>
@@ -89,7 +100,9 @@ export const useAppStore = create<AppState>((set) => ({
         outputDir,
         stems,
         mutedChannels: stemsReplaced ? initialMutedChannels() : state.mutedChannels,
-        soloChannels: stemsReplaced ? initialSoloChannels() : state.soloChannels
+        soloChannels: stemsReplaced ? initialSoloChannels() : state.soloChannels,
+        channelVolumes: stemsReplaced ? initialChannelVolumes() : state.channelVolumes,
+        masterVolume: stemsReplaced ? 1 : state.masterVolume
       };
       if (payload.type === "progress") {
         return nextState;
@@ -106,7 +119,12 @@ export const useAppStore = create<AppState>((set) => ({
   toggleChannelSolo: (channel) =>
     set((state) => ({
       soloChannels: { ...state.soloChannels, [channel]: !state.soloChannels[channel] }
-    }))
+    })),
+  setChannelVolume: (channel, volume) =>
+    set((state) => ({
+      channelVolumes: { ...state.channelVolumes, [channel]: clampVolume(volume) }
+    })),
+  setMasterVolume: (masterVolume) => set({ masterVolume: clampVolume(masterVolume) })
 }));
 
 export type { StemItem, AppState, AppView } from "./types";

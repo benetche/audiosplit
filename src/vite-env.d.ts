@@ -18,6 +18,8 @@ declare global {
     audioSplit: {
       getLocalFilePath: (file: File) => string | null;
       audioUrlFromPath: (absolutePath: string) => string;
+      getAudioDuration: (absolutePath: string) => Promise<number>;
+      getAudioBytes: (absolutePath: string) => Promise<ArrayBuffer | null>;
       startSeparation: (request: StartSeparationRequest) => Promise<StartSeparationResponse>;
       getSeparationDevices: () => Promise<SeparationDeviceInfo[]>;
       onProgress: (callback: (payload: ProgressPayload) => void) => () => void;

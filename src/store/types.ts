@@ -26,6 +26,10 @@ export type AppState = {
   mutedChannels: Record<MixerChannel, boolean>;
   /** true = canal em solo (se algum solo ativo, so os solos tocam) */
   soloChannels: Record<MixerChannel, boolean>;
+  /** Volume por canal, de 0 a 1. */
+  channelVolumes: Record<MixerChannel, number>;
+  /** Volume master do mix, de 0 a 1. */
+  masterVolume: number;
   /** Ultima pasta escolhida para downloads nesta sessao (nao persistida em disco). */
   lastDownloadDir: string;
   language: AppLanguage;
@@ -42,6 +46,8 @@ export type AppState = {
   applyProgress: (payload: ProgressPayload) => void;
   toggleChannelMute: (channel: MixerChannel) => void;
   toggleChannelSolo: (channel: MixerChannel) => void;
+  setChannelVolume: (channel: MixerChannel, volume: number) => void;
+  setMasterVolume: (volume: number) => void;
   setLastDownloadDir: (dir: string) => void;
   setLanguage: (language: AppLanguage) => void;
 };

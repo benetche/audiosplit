@@ -17,6 +17,8 @@ type SeparationApi = {
   getLocalFilePath: (file: File) => string | null;
   /** URL para <audio src> (evita bloqueio file:// com origem http do Vite). */
   audioUrlFromPath: (absolutePath: string) => string;
+  getAudioDuration: (absolutePath: string) => Promise<number>;
+  getAudioBytes: (absolutePath: string) => Promise<ArrayBuffer | null>;
   startSeparation: (request: StartSeparationRequest) => Promise<StartSeparationResponse>;
   getSeparationDevices: () => Promise<SeparationDeviceInfo[]>;
   onProgress: (callback: (payload: ProgressPayload) => void) => () => void;
@@ -56,6 +58,8 @@ const audioUrlFromPath = (absolutePath: string): string =>
 const api: SeparationApi = {
   getLocalFilePath,
   audioUrlFromPath,
+  getAudioDuration: (absolutePath: string) => ipcRenderer.invoke("audio:duration", absolutePath),
+  getAudioBytes: (absolutePath: string) => ipcRenderer.invoke("audio:bytes", absolutePath),
   startSeparation: (request: StartSeparationRequest) => ipcRenderer.invoke("separation:start", request),
   getSeparationDevices: () => ipcRenderer.invoke("separation:devices"),
   onProgress: (callback) => {

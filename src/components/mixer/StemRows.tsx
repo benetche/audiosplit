@@ -31,8 +31,10 @@ export function StemRows({ stems, duration, displayTime, onSeek }: StemRowsProps
   const { t } = useI18n();
   const muted = useAppStore((s) => s.mutedChannels);
   const solo = useAppStore((s) => s.soloChannels);
+  const channelVolumes = useAppStore((s) => s.channelVolumes);
   const toggleMute = useAppStore((s) => s.toggleChannelMute);
   const toggleSolo = useAppStore((s) => s.toggleChannelSolo);
+  const setChannelVolume = useAppStore((s) => s.setChannelVolume);
 
   const progress = duration > 0 ? displayTime / duration : 0;
 
@@ -87,7 +89,24 @@ export function StemRows({ stems, duration, displayTime, onSeek }: StemRowsProps
               )}
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex min-w-[235px] items-center gap-2">
+              <label className="flex flex-1 items-center gap-2 text-xs text-text-secondary">
+                <span className="sr-only">{t("mixer.channelVolume", { channel: channelLabel })}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={channelVolumes[channel]}
+                  disabled={!has}
+                  aria-label={t("mixer.channelVolume", { channel: channelLabel })}
+                  onChange={(event) => setChannelVolume(channel, Number.parseFloat(event.target.value))}
+                  className="h-1 flex-1 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-40"
+                />
+                <span className="mono w-9 text-right text-[10px] text-text-muted">
+                  {Math.round(channelVolumes[channel] * 100)}%
+                </span>
+              </label>
               <TogglePill
                 label="S"
                 title={t("mixer.solo")}

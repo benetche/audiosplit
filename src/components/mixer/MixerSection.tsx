@@ -28,6 +28,8 @@ export function MixerSection() {
 function MixerBody() {
   const { t } = useI18n();
   const stems = useAppStore((s) => s.stems);
+  const masterVolume = useAppStore((s) => s.masterVolume);
+  const setMasterVolume = useAppStore((s) => s.setMasterVolume);
   const playback = useStemPlayback(stems);
 
   return (
@@ -43,8 +45,10 @@ function MixerBody() {
         ready={playback.ready}
         duration={playback.duration}
         displayTime={playback.displayTime}
+        masterVolume={masterVolume}
         onPlayPause={() => void playback.playPause()}
         onSeek={playback.seek}
+        onMasterVolumeChange={setMasterVolume}
       />
       <StemRows
         stems={stems}

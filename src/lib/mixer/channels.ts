@@ -19,12 +19,24 @@ const initialMuted: Record<MixerChannel, boolean> = {
   other: false
 };
 
+const initialVolumes: Record<MixerChannel, number> = {
+  vocals: 1,
+  drums: 1,
+  bass: 1,
+  guitars: 1,
+  other: 1
+};
+
 export function initialMutedChannels(): Record<MixerChannel, boolean> {
   return { ...initialMuted };
 }
 
 export function initialSoloChannels(): Record<MixerChannel, boolean> {
   return { ...initialMuted };
+}
+
+export function initialChannelVolumes(): Record<MixerChannel, number> {
+  return { ...initialVolumes };
 }
 
 /**

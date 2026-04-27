@@ -1,4 +1,4 @@
-import { Pause, Play } from "lucide-react";
+import { Pause, Play, Volume2 } from "lucide-react";
 import { useI18n } from "../../i18n/I18nProvider";
 import { formatTime } from "../../lib/audio/formatTime";
 
@@ -7,15 +7,26 @@ type MixerTransportProps = {
   ready: boolean;
   duration: number;
   displayTime: number;
+  masterVolume: number;
   onPlayPause: () => void;
   onSeek: (value: number) => void;
+  onMasterVolumeChange: (value: number) => void;
 };
 
-export function MixerTransport({ playing, ready, duration, displayTime, onPlayPause, onSeek }: MixerTransportProps) {
+export function MixerTransport({
+  playing,
+  ready,
+  duration,
+  displayTime,
+  masterVolume,
+  onPlayPause,
+  onSeek,
+  onMasterVolumeChange
+}: MixerTransportProps) {
   const { t } = useI18n();
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <button
           type="button"
           onClick={onPlayPause}
@@ -28,6 +39,20 @@ export function MixerTransport({ playing, ready, duration, displayTime, onPlayPa
         <span className="mono text-sm tabular-nums text-text-secondary">
           {formatTime(displayTime)} <span className="text-text-muted">/ {formatTime(duration)}</span>
         </span>
+        <label className="ml-auto flex min-w-[190px] items-center gap-2 text-xs text-text-secondary">
+          <Volume2 className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
+          <span className="whitespace-nowrap">{t("mixer.masterVolume")}</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={masterVolume}
+            onChange={(e) => onMasterVolumeChange(Number.parseFloat(e.target.value))}
+            className="h-1 flex-1 cursor-pointer accent-accent"
+          />
+          <span className="mono w-9 text-right text-[11px] text-text-muted">{Math.round(masterVolume * 100)}%</span>
+        </label>
       </div>
 
       <input

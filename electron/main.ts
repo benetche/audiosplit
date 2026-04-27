@@ -539,6 +539,67 @@ const AUDIO_EXT_RE = /\.(wav|mp3|flac|m4a|aiff|aif|ogg)$/i;
 const JOB_ID_SUFFIX_RE = /_[0-9a-f-]{8,}$/i;
 const LIBRARY_LIST_CONCURRENCY = 8;
 
+const readWavDuration = async (sourcePath: string): Promise<number> => {
+  const normalized = path.normalize(sourcePath);
+  if (!isPathUnderOutputRoot(normalized) || path.extname(normalized).toLowerCase() !== ".wav") {
+    return 0;
+  }
+
+  const handle = await fs.open(normalized, "r");
+  try {
+    const header = Buffer.alloc(12);
+    const { bytesRead } = await handle.read(header, 0, header.length, 0);
+    if (bytesRead < header.length || header.toString("ascii", 0, 4) !== "RIFF" || header.toString("ascii", 8, 12) !== "WAVE") {
+      return 0;
+    }
+
+    let position = 12;
+    let byteRate = 0;
+    let dataSize = 0;
+    const chunkHeader = Buffer.alloc(8);
+
+    while (position < 1024 * 1024) {
+      const chunk = await handle.read(chunkHeader, 0, chunkHeader.length, position);
+      if (chunk.bytesRead < chunkHeader.length) break;
+
+      const chunkId = chunkHeader.toString("ascii", 0, 4);
+      const chunkSize = chunkHeader.readUInt32LE(4);
+      const chunkDataPosition = position + 8;
+
+      if (chunkId === "fmt ") {
+        const fmt = Buffer.alloc(Math.min(chunkSize, 16));
+        await handle.read(fmt, 0, fmt.length, chunkDataPosition);
+        if (fmt.length >= 12) {
+          byteRate = fmt.readUInt32LE(8);
+        }
+      } else if (chunkId === "data") {
+        dataSize = chunkSize;
+        break;
+      }
+
+      position = chunkDataPosition + chunkSize + (chunkSize % 2);
+    }
+
+    if (byteRate <= 0 || dataSize <= 0) return 0;
+    return dataSize / byteRate;
+  } catch {
+    return 0;
+  } finally {
+    await handle.close();
+  }
+};
+
+const readAudioBytes = async (sourcePath: string): Promise<ArrayBuffer | null> => {
+  const normalized = path.normalize(sourcePath);
+  const extension = path.extname(normalized).toLowerCase();
+  if (!isPathUnderOutputRoot(normalized) || !ALLOWED_EXTENSIONS.has(extension) || !existsSync(normalized)) {
+    return null;
+  }
+
+  const bytes = await fs.readFile(normalized);
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+};
+
 const readLibraryEntry = async (root: string, dirent: import("node:fs").Dirent): Promise<LibraryEntry | null> => {
   const fullPath = path.join(root, dirent.name);
   try {
@@ -706,6 +767,8 @@ app.whenReady().then(() => {
   ipcMain.handle("youtube:preview", async (_event, url: string) => runYoutubePreview(url));
 
   ipcMain.handle("stem:export", async (_event, sourcePath: string) => exportStem(sourcePath));
+  ipcMain.handle("audio:duration", async (_event, sourcePath: string) => readWavDuration(sourcePath));
+  ipcMain.handle("audio:bytes", async (_event, sourcePath: string) => readAudioBytes(sourcePath));
 
   ipcMain.handle("library:list", async () => listLibraryEntries());
   ipcMain.handle("library:remove", async (_event, dirPath: string) => removeLibraryEntry(dirPath));
