@@ -4,15 +4,25 @@ import { initialMutedChannels, initialSoloChannels } from "../lib/mixer/channels
 import type { AppState } from "./types";
 
 const APP_LANGUAGE_KEY = "audiosplit.language";
+const MAX_LOG_ENTRIES = 200;
 
 const loadInitialLanguage = (): AppLanguage => {
-  const stored = window.localStorage.getItem(APP_LANGUAGE_KEY);
-  if (stored === "en" || stored === "pt-BR") {
-    return stored;
+  try {
+    const stored = window.localStorage.getItem(APP_LANGUAGE_KEY);
+    if (stored === "en" || stored === "pt-BR") {
+      return stored;
+    }
+  } catch {
+    // Some Electron contexts can deny storage; default language keeps startup resilient.
   }
   return "en";
 };
 const defaultSeparationDevices = [{ mode: "cpu" as const, name: "CPU", label: "CPU - CPU", kind: "cpu" as const }];
+
+const appendLogEntry = (logs: string[], entry: string): string[] => {
+  const next = [...logs, entry];
+  return next.length > MAX_LOG_ENTRIES ? next.slice(-MAX_LOG_ENTRIES) : next;
+};
 
 export const useAppStore = create<AppState>((set) => ({
   view: "download",
@@ -42,13 +52,17 @@ export const useAppStore = create<AppState>((set) => ({
     }),
   setLastDownloadDir: (lastDownloadDir) => set({ lastDownloadDir }),
   setLanguage: (language) => {
-    window.localStorage.setItem(APP_LANGUAGE_KEY, language);
+    try {
+      window.localStorage.setItem(APP_LANGUAGE_KEY, language);
+    } catch {
+      // Language still changes for this session even if persistence is unavailable.
+    }
     set({ language });
   },
   setDeviceMode: (deviceMode) => set({ deviceMode }),
   setSeparationDevices: (separationDevices) => set({ separationDevices, separationDevicesLoaded: true }),
   setSeparationDevicesLoading: (separationDevicesLoading) => set({ separationDevicesLoading }),
-  appendLog: (entry) => set((state) => ({ logs: [...state.logs, entry] })),
+  appendLog: (entry) => set((state) => ({ logs: appendLogEntry(state.logs, entry) })),
   clearLogs: () => set({ logs: [] }),
   resetJob: () =>
     set({
@@ -70,13 +84,19 @@ export const useAppStore = create<AppState>((set) => ({
           name: stemPath.split(/[\\/]/).pop() ?? stemPath
         })) ?? state.stems;
       const stemsReplaced = Boolean(payload.stems?.length);
-      return {
+      const nextState = {
         progress,
         outputDir,
         stems,
         mutedChannels: stemsReplaced ? initialMutedChannels() : state.mutedChannels,
-        soloChannels: stemsReplaced ? initialSoloChannels() : state.soloChannels,
-        logs: [...state.logs, `[${payload.type}] ${localizeProgressMessage(state.language, payload.message)}`]
+        soloChannels: stemsReplaced ? initialSoloChannels() : state.soloChannels
+      };
+      if (payload.type === "progress") {
+        return nextState;
+      }
+      return {
+        ...nextState,
+        logs: appendLogEntry(state.logs, `[${payload.type}] ${localizeProgressMessage(state.language, payload.message)}`)
       };
     }),
   toggleChannelMute: (channel) =>
